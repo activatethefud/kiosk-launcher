@@ -45,7 +45,7 @@ class TestPassword(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Config
+# Config (settings + password only; apps now live in apps.json)
 # ---------------------------------------------------------------------------
 class TestConfig(unittest.TestCase):
     def setUp(self):
@@ -60,39 +60,117 @@ class TestConfig(unittest.TestCase):
         self.assertIn("iterations", cfg["password"])
         self.assertIn("fullscreen", cfg)
         self.assertIn("columns", cfg)
-        self.assertGreater(len(cfg["apps"]), 0)
-        for app in cfg["apps"]:
-            self.assertIn("name", app)
-            self.assertIn("patterns", app)
-            self.assertIn("args", app)
+        self.assertNotIn("apps", cfg)  # apps are no longer in the config
 
     def test_load_creates_file(self):
         self.assertFalse(os.path.exists(self.path))
         cfg, path = k.load_config(self.path)
         self.assertTrue(os.path.exists(self.path))
         self.assertEqual(path, self.path)
-        self.assertGreater(len(cfg["apps"]), 0)
+        self.assertIn("password", cfg)
+        self.assertIn("columns", cfg)
 
     def test_load_repairs_missing_password(self):
         with open(self.path, "w", encoding="utf-8") as f:
-            json.dump({"fullscreen": True, "columns": 2, "apps": []}, f)
+            json.dump({"fullscreen": True, "columns": 2}, f)
         cfg, _ = k.load_config(self.path)
         self.assertIn("salt", cfg["password"])
         self.assertIn("hash", cfg["password"])
 
-    def test_load_repairs_missing_apps(self):
+    def test_load_preserves_settings(self):
         with open(self.path, "w", encoding="utf-8") as f:
-            json.dump({"fullscreen": False, "columns": 4}, f)
+            json.dump({"fullscreen": True, "columns": 3}, f)
         cfg, _ = k.load_config(self.path)
-        self.assertEqual(cfg["apps"], k.BUILTIN_APPS)
+        self.assertTrue(cfg["fullscreen"])
+        self.assertEqual(cfg["columns"], 3)
 
     def test_save_load_roundtrip(self):
         cfg, _ = k.load_config(self.path)
-        cfg["apps"].append({"name": "X", "patterns": ["x$"], "args": [], "custom": True})
         cfg["columns"] = 3
         k.save_config(cfg, self.path)
         cfg2, _ = k.load_config(self.path)
         self.assertEqual(cfg, cfg2)
+
+
+# ---------------------------------------------------------------------------
+# App templates (apps.json)
+# ---------------------------------------------------------------------------
+class TestAppTemplates(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.tmp.name, "apps.json")
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_load_seeds_file_from_presets_when_missing(self):
+        self.assertFalse(os.path.exists(self.path))
+        apps, path = k.load_apps(self.path)
+        self.assertEqual(path, self.path)
+        self.assertTrue(os.path.exists(self.path))
+        self.assertEqual(apps, k.BUILTIN_APPS)
+
+    def test_load_reads_list(self):
+        data = [{"name": "GIMP", "patterns": [r"gimp(?:\.exe)?$"], "args": []}]
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        apps, _ = k.load_apps(self.path)
+        self.assertEqual(apps, data)
+
+    def test_load_accepts_wrapped_dict(self):
+        data = {"apps": [{"name": "X", "patterns": ["x$"], "args": []}]}
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        apps, _ = k.load_apps(self.path)
+        self.assertEqual(len(apps), 1)
+        self.assertEqual(apps[0]["name"], "X")
+
+    def test_normalize_coerces_string_patterns_and_args(self):
+        data = [{"name": "X", "patterns": "x$", "args": "--flag --two"}]
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        apps, _ = k.load_apps(self.path)
+        self.assertEqual(apps[0]["patterns"], ["x$"])
+        self.assertEqual(apps[0]["args"], ["--flag", "--two"])
+
+    def test_invalid_entries_are_skipped(self):
+        data = [
+            {"name": "Good", "patterns": ["good$"], "args": []},
+            {"name": "", "patterns": ["x$"], "args": []},          # no name
+            {"name": "NoPatterns", "patterns": [], "args": []},    # no patterns
+            "not-a-dict",
+        ]
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        apps, _ = k.load_apps(self.path)
+        self.assertEqual([a["name"] for a in apps], ["Good"])
+
+    def test_invalid_json_falls_back_without_overwriting(self):
+        original = "{ this is not valid json"
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(original)
+        with mock.patch("sys.stderr"):
+            apps, _ = k.load_apps(self.path)
+        self.assertEqual(apps, k.BUILTIN_APPS)
+        with open(self.path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), original)  # not clobbered
+
+    def test_explicitly_empty_file_is_respected(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump([], f)
+        apps, _ = k.load_apps(self.path)
+        self.assertEqual(apps, [])
+
+    def test_save_load_roundtrip(self):
+        apps, _ = k.load_apps(self.path)
+        apps.append({"name": "GIMP", "patterns": [r"gimp(?:\.exe)?$"], "args": []})
+        k.save_apps(apps, self.path)
+        apps2, _ = k.load_apps(self.path)
+        self.assertEqual(apps, apps2)
+
+    def test_normalize_app_rejects_missing_name(self):
+        self.assertIsNone(k.normalize_app({"patterns": ["x$"], "args": []}))
+
+    def test_normalize_app_rejects_missing_patterns(self):
+        self.assertIsNone(k.normalize_app({"name": "X", "args": []}))
 
 
 # ---------------------------------------------------------------------------
@@ -105,41 +183,39 @@ class TestDiscovery(unittest.TestCase):
             r"C:\Program Files\Scratch 3\Scratch 3.exe",
             "/opt/games/MyCoolGame",
         }
-        cfg = {
-            "apps": [
-                {"name": "GIMP", "patterns": [r"gimp(?:\.exe)?$"], "args": []},
-                {"name": "Scratch", "patterns": [r"scratch(?: ?3)?(?:\.exe)?$"], "args": []},
-                {"name": "Game", "patterns": [r"coolgame(?:\.exe)?$"], "args": []},
-                {"name": "Nope", "patterns": [r"nope(?:\.exe)?$"], "args": []},
-            ]
-        }
+        apps = [
+            {"name": "GIMP", "patterns": [r"gimp(?:\.exe)?$"], "args": []},
+            {"name": "Scratch", "patterns": [r"scratch(?: ?3)?(?:\.exe)?$"], "args": []},
+            {"name": "Game", "patterns": [r"coolgame(?:\.exe)?$"], "args": []},
+            {"name": "Nope", "patterns": [r"nope(?:\.exe)?$"], "args": []},
+        ]
         with mock.patch.object(k, "gather_candidates", return_value=candidates):
-            found, missing = k.discover_apps(cfg)
+            found, missing = k.discover_apps(apps)
         names = {a["name"] for a in found}
         self.assertEqual(names, {"GIMP", "Scratch", "Game"})
         self.assertEqual(missing, ["Nope"])
 
     def test_matching_is_case_insensitive(self):
         candidates = {"/usr/bin/GIMP"}
-        cfg = {"apps": [{"name": "G", "patterns": [r"gimp$"], "args": []}]}
+        apps = [{"name": "G", "patterns": [r"gimp$"], "args": []}]
         with mock.patch.object(k, "gather_candidates", return_value=candidates):
-            found, missing = k.discover_apps(cfg)
+            found, missing = k.discover_apps(apps)
         self.assertEqual(len(found), 1)
         self.assertEqual(missing, [])
 
     def test_args_are_passed_through(self):
         candidates = {"/usr/bin/app"}
-        cfg = {"apps": [{"name": "A", "patterns": ["app$"], "args": ["--flag"]}]}
+        apps = [{"name": "A", "patterns": ["app$"], "args": ["--flag"]}]
         with mock.patch.object(k, "gather_candidates", return_value=candidates):
-            found, _ = k.discover_apps(cfg)
+            found, _ = k.discover_apps(apps)
         self.assertEqual(found[0]["args"], ["--flag"])
 
     def test_bad_regex_is_reported_missing_not_fatal(self):
         candidates = {"/usr/bin/app"}
-        cfg = {"apps": [{"name": "Bad", "patterns": ["(unclosed"], "args": []}]}
+        apps = [{"name": "Bad", "patterns": ["(unclosed"], "args": []}]
         with mock.patch.object(k, "gather_candidates", return_value=candidates):
             with mock.patch("sys.stderr"):
-                found, missing = k.discover_apps(cfg)
+                found, missing = k.discover_apps(apps)
         self.assertEqual(found, [])
         self.assertEqual(missing, ["Bad"])
 

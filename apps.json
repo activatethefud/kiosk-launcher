@@ -1,0 +1,39 @@
+[
+  {
+    "name": "LibreOffice",
+    "patterns": [
+      "soffice(?:\\.exe)?$",
+      "libreoffice(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Scratch",
+    "patterns": [
+      "scratch(?: ?3|desktop|2)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Visual Studio Code",
+    "patterns": [
+      "(?:^|[\\\\/])code(?:\\.cmd|\\.exe)?$",
+      "vscode(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "VSCodium",
+    "patterns": [
+      "(?:^|[\\\\/])codium(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft Word",
+    "patterns": [
+      "winword(?:\\.exe)?$"
+    ],
+    "args": []
+  }
+]

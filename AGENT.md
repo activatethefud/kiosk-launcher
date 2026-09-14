@@ -13,9 +13,10 @@ File layout:
 ```
 kiosk_launcher.py      # the entire application
 tests/test_kiosk_launcher.py
+apps.json              # app search templates (editable, copyable, TRACKED in git)
 README.md              # user-facing docs + Windows shell deployment recipe
 AGENT.md               # this file
-kiosk_config.json      # runtime-generated, GITIGNORED (auto-created on first run)
+kiosk_config.json      # runtime-generated settings + password, GITIGNORED
 ```
 
 ## Commands
@@ -26,6 +27,7 @@ python3 kiosk_launcher.py --kiosk            # frameless fullscreen (locked)
 python3 kiosk_launcher.py --scan             # print discovery results, no GUI
 python3 kiosk_launcher.py --set-password     # change admin password (interactive)
 python3 kiosk_launcher.py --config PATH      # use a specific config file
+python3 kiosk_launcher.py --apps PATH        # use a specific apps.json
 
 # tests (stdlib unittest; also runnable with pytest)
 python3 -m unittest discover -s tests -v
@@ -47,23 +49,33 @@ QT_QPA_PLATFORM=offscreen python3 kiosk_launcher.py --smoke
 
 Top-level functions (module `kiosk_launcher`):
 
-- `BUILTIN_APPS` — presets; each entry is `{"name", "patterns": [regex...], "args"}`.
-  Regexes are matched **case-insensitively** against candidate exe **full paths**
-  with `re.search`. Always anchor to the filename with `$`.
-- `seed_config()` / `load_config(path)` / `save_config(cfg, path)` — config I/O.
-  `load_config` repairs missing keys and is idempotent. Config is JSON.
+- `BUILTIN_APPS` — seed presets, used only to populate `apps.json` when it is
+  missing. Entries: `{"name", "patterns": [regex...], "args"}`. Regexes are
+  matched **case-insensitively** against candidate exe **full paths** with
+  `re.search`. Always anchor to the filename with `$`.
+- `seed_config()` / `load_config(path)` / `save_config(cfg, path)` — settings +
+  password I/O (no app data). `load_config` repairs missing keys and is
+  idempotent. Config is JSON.
+- `normalize_app(entry)` / `load_apps(path)` / `save_apps(apps, path)` — the
+  app list lives in `apps.json` (source of truth). `normalize_app` coerces
+  string patterns/args to lists and drops invalid entries. `load_apps` seeds
+  the file from `BUILTIN_APPS` when absent, falls back to presets in memory on
+  parse errors (without overwriting the user's file), and respects an
+  explicitly empty list.
 - `hash_password(pw, salt=None, iterations=200_000)` / `verify_password(pw, pw_cfg)` —
   PBKDF2-HMAC-SHA256, random salt via `secrets`, constant-time compare.
 - `gather_candidates()` — returns a `set` of normalized executable paths,
   platform-specific (see "Discovery" below).
-- `discover_apps(cfg)` — returns `(found, missing)` where `found` is a list of
-  `{"name", "path", "args"}` and `missing` is a list of names. A bad regex in
-  config is reported as missing (with a stderr warning) rather than crashing.
+- `discover_apps(apps)` — takes the app template list (NOT the config); returns
+  `(found, missing)` where `found` is a list of `{"name", "path", "args"}` and
+  `missing` is a list of names. A bad regex is reported as missing (stderr
+  warning) rather than crashing.
 - `launch(app)` — `subprocess.Popen`, non-blocking; returns `None` or an error
   string. Windows Store aliases (paths containing `WindowsApps`) are launched
   via `cmd /c start`.
 - `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
-  password prompts, and close/keyboard handling.
+  password prompts, and close/keyboard handling. Admin add/remove app edits
+  the in-memory app list and calls `save_apps`.
 - CLI modes: `cmd_scan(args)`, `cmd_set_password(args)`.
 
 ### Discovery (the important part)
@@ -83,8 +95,11 @@ Top-level functions (module `kiosk_launcher`):
   only sanctioned runtime dependency is PySide6.
 - Guard Windows-only code with `os.name == "nt"`; never hard-code paths.
 - Cross-platform strings/args: use `shlex.split(posix=(os.name == "posix"))`.
-- Config is **not** committed (gitignored). Do not commit real password hashes.
-- When adding a preset, add it to `BUILTIN_APPS` with filename-anchored regexes.
+- Config is **not** committed (gitignored). `apps.json` **is** committed — it
+  is the canonical, centrally-managed template. Do not commit real password
+  hashes.
+- When adding a preset, add it to `BUILTIN_APPS` (and to the tracked
+  `apps.json`) with filename-anchored regexes.
 - Tests: prefer `mock.patch.object(kiosk_launcher, "gather_candidates", ...)`
   for discovery tests so they are deterministic and machine-independent.
 - New behavior should come with a test in `tests/test_kiosk_launcher.py`.

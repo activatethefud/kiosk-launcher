@@ -14,7 +14,9 @@ Features
   .desktop files, /opt, snap/flatpak export dirs, AppData/Programs
 * Password-protected admin area to add more apps by name + regex
   (one regex per line, matched case-insensitively against the exe path)
-* Config stored in kiosk_config.json next to this script (or --config)
+* App search templates live in an external apps.json file (easy to extend
+  with an LLM and copy to other machines); settings/password live in
+  kiosk_config.json
 
 Usage
 -----
@@ -23,6 +25,7 @@ Usage
     python3 kiosk_launcher.py --scan          # print what was found, then exit
     python3 kiosk_launcher.py --set-password  # change the admin password
     python3 kiosk_launcher.py --config PATH   # use a different config file
+    python3 kiosk_launcher.py --apps PATH     # use a different apps.json
 
 Default admin password on first run: admin   (change it with --set-password!)
 """
@@ -88,12 +91,19 @@ DEFAULT_EMOJI = "\U0001F680"
 # ==========================================================================
 # Config
 # ==========================================================================
-def default_config_path():
+def _base_dir():
+    """Directory holding the script (or the frozen exe)."""
     if getattr(sys, "frozen", False):          # PyInstaller one-file build
-        base = os.path.dirname(os.path.abspath(sys.executable))
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "kiosk_config.json")
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def default_config_path():
+    return os.path.join(_base_dir(), "kiosk_config.json")
+
+
+def default_apps_path():
+    return os.path.join(_base_dir(), "apps.json")
 
 
 def seed_config():
@@ -102,7 +112,6 @@ def seed_config():
         "password": {"salt": salt, "hash": digest, "iterations": iterations},
         "fullscreen": False,
         "columns": 4,
-        "apps": [dict(a) for a in BUILTIN_APPS],
     }
 
 
@@ -122,7 +131,6 @@ def load_config(path):
 
     cfg.setdefault("fullscreen", False)
     cfg.setdefault("columns", 4)
-    cfg.setdefault("apps", [dict(a) for a in BUILTIN_APPS])
     if "password" not in cfg or "salt" not in cfg.get("password", {}):
         cfg["password"] = seed_config()["password"]
         created = True
@@ -135,6 +143,71 @@ def load_config(path):
 def save_config(cfg, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+
+# ==========================================================================
+# App search templates (apps.json)
+# ==========================================================================
+def normalize_app(entry):
+    """Validate/coerce one app template. Returns a clean dict or None."""
+    if not isinstance(entry, dict):
+        return None
+    name = entry.get("name")
+    patterns = entry.get("patterns")
+    args = entry.get("args", [])
+    if not isinstance(name, str) or not name.strip():
+        return None
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    if not isinstance(patterns, list) or not patterns:
+        return None
+    patterns = [p for p in patterns if isinstance(p, str) and p.strip()]
+    if not patterns:
+        return None
+    if isinstance(args, str):
+        args = shlex.split(args, posix=(os.name == "posix"))
+    if not isinstance(args, list):
+        args = []
+    return {"name": name.strip(), "patterns": patterns, "args": args}
+
+
+def load_apps(path):
+    """Load app search templates. Seeds apps.json from presets if absent.
+
+    Returns (apps, path). If the file exists but is invalid, the built-in
+    presets are used in memory (the file is NOT overwritten).
+    """
+    apps = None
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            raw = data if isinstance(data, list) else data.get("apps") if isinstance(data, dict) else None
+            if isinstance(raw, list):
+                apps = [a for a in (normalize_app(e) for e in raw) if a]
+                if not apps and raw:
+                    print(
+                        f"WARNING: no valid app entries in {path}; "
+                        "using built-in presets",
+                        file=sys.stderr,
+                    )
+                    apps = [dict(a) for a in BUILTIN_APPS]
+        except (json.JSONDecodeError, OSError) as e:
+            print(
+                f"WARNING: could not parse {path}: {e}; using built-in presets",
+                file=sys.stderr,
+            )
+            apps = None
+    if apps is None:
+        apps = [dict(a) for a in BUILTIN_APPS]
+        if not os.path.exists(path):
+            save_apps(apps, path)
+    return apps, path
+
+
+def save_apps(apps, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(apps, f, indent=2, ensure_ascii=False)
 
 
 # ==========================================================================
@@ -317,11 +390,11 @@ def gather_candidates():
     return cands
 
 
-def discover_apps(cfg):
-    """Return (found, missing) for the configured app entries."""
+def discover_apps(apps):
+    """Return (found, missing) for the given app templates."""
     candidates = sorted(gather_candidates(), key=str.lower)
     found, missing = [], []
-    for app in cfg["apps"]:
+    for app in apps:
         try:
             pats = [re.compile(p, re.IGNORECASE) for p in app["patterns"]]
         except re.error as e:
@@ -373,9 +446,12 @@ def launch(app):
 # CLI modes (no GUI needed)
 # ==========================================================================
 def cmd_scan(args):
-    cfg, path = load_config(args.config or default_config_path())
-    found, missing = discover_apps(cfg)
-    print(f"Config: {path}")
+    cfg_path = args.config or default_config_path()
+    cfg, _ = load_config(cfg_path)
+    apps, apps_path = load_apps(args.apps or default_apps_path())
+    found, missing = discover_apps(apps)
+    print(f"Config: {cfg_path}")
+    print(f"Apps:   {apps_path} ({len(apps)} templates)")
     print("Found:")
     for a in found:
         print(f"  \u2714 {a['name']}: {a['path']}")
@@ -435,6 +511,7 @@ def run_gui(args):
         )
 
     cfg, path = load_config(args.config or default_config_path())
+    apps, apps_path = load_apps(args.apps or default_apps_path())
 
     class AddAppDialog(QDialog):
         def __init__(self, parent=None):
@@ -527,6 +604,8 @@ def run_gui(args):
             super().__init__()
             self.cfg = cfg
             self.cfg_path = path
+            self.apps = apps
+            self.apps_path = apps_path
             self.kiosk = args.kiosk or (cfg.get("fullscreen", False) and not args.windowed)
             self.setWindowTitle(APP_NAME)
 
@@ -583,7 +662,7 @@ def run_gui(args):
                 w = item.widget()
                 if w:
                     w.deleteLater()
-            found, missing = discover_apps(self.cfg)
+            found, missing = discover_apps(self.apps)
             cols = max(1, int(self.cfg.get("columns", 4)))
             for i, a in enumerate(found):
                 key = a["name"].lower()
@@ -631,21 +710,19 @@ def run_gui(args):
         def add_app(self):
             dlg = AddAppDialog(self)
             if dlg.exec() == QDialog.Accepted:
-                self.cfg["apps"].append(dlg.values())
-                save_config(self.cfg, self.cfg_path)
+                self.apps.append(dlg.values())
+                save_apps(self.apps, self.apps_path)
                 self.rebuild()
 
         def remove_app(self):
-            dlg = RemoveAppDialog(self.cfg["apps"], self)
+            dlg = RemoveAppDialog(self.apps, self)
             if dlg.exec() == QDialog.Accepted:
                 selected = dlg.selected()
                 if not selected:
                     return
                 names = {a["name"] for a in selected}
-                self.cfg["apps"] = [
-                    a for a in self.cfg["apps"] if a["name"] not in names
-                ]
-                save_config(self.cfg, self.cfg_path)
+                self.apps = [a for a in self.apps if a["name"] not in names]
+                save_apps(self.apps, self.apps_path)
                 self.rebuild()
 
         def change_password(self):
@@ -709,6 +786,7 @@ def main():
         description=f"{APP_NAME} v{VERSION} — locked-down classroom app launcher."
     )
     parser.add_argument("--config", help="path to kiosk_config.json")
+    parser.add_argument("--apps", help="path to apps.json (app search templates)")
     parser.add_argument("--scan", action="store_true", help="print discovery results and exit")
     parser.add_argument("--set-password", action="store_true", help="change the admin password and exit")
     parser.add_argument("--kiosk", action="store_true", help="frameless fullscreen, exit requires password")

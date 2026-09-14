@@ -19,15 +19,18 @@ more apps by regex.
 - **Kiosk mode:** frameless fullscreen; exiting requires the admin password
 - **One config file** (`kiosk_config.json`) — auto-generated on first run
   (gitignored), so each machine can build its own.
+- **App list is a plain data file** (`apps.json`) — extend it with an LLM and
+  copy it to every machine; no code changes needed.
 
 ## Project layout
 
 ```
 kiosk_launcher.py           # the entire application (single file)
+apps.json                   # app search templates (editable, copyable)
 tests/test_kiosk_launcher.py
 AGENT.md                    # guidance for AI coding agents
 README.md
-kiosk_config.json           # runtime-generated, not committed
+kiosk_config.json           # runtime-generated settings + password, not committed
 ```
 
 ## Quick start
@@ -42,6 +45,7 @@ python3 kiosk_launcher.py --kiosk        # frameless fullscreen (locked)
 python3 kiosk_launcher.py --scan         # show what was found, no GUI
 python3 kiosk_launcher.py --set-password # change admin password
 python3 kiosk_launcher.py --config X.json
+python3 kiosk_launcher.py --apps A.json      # use a different app list
 ```
 
 **Default admin password: `admin`** — change it with `--set-password`.
@@ -61,8 +65,35 @@ python3 kiosk_launcher.py --config X.json
    The regex is matched case-insensitively against each discovered
    executable's full path. Use `$` to anchor to the filename.
 
-The added entry is saved to `kiosk_config.json` and the launcher rescans
+The added entry is saved to `apps.json` and the launcher rescans
 immediately.
+
+## Customizing the app list (`apps.json`)
+
+`apps.json` is a simple JSON array of search templates — one per app:
+
+```jsonc
+[
+  {
+    "name": "GIMP",
+    "patterns": ["gimp(?:\\.exe)?$", "gimp-2\\.10(?:\\.exe)?$"],
+    "args": []
+  },
+  { "name": "Firefox", "patterns": "firefox(?:\\.exe)?$", "args": "--kiosk" }
+]
+```
+
+- `name` — the button label.
+- `patterns` — one or more regexes, matched case-insensitively against each
+  discovered executable's **full path**. Anchor with `$`. A bare string is
+  accepted and treated as a single pattern.
+- `args` — optional launch arguments (string or list).
+
+This file is intentionally plain and machine-editable: have an LLM add a
+hundred app patterns, then copy the same `apps.json` to every client. On
+first run (or whenever it's missing), the launcher seeds it from the built-in
+presets. Invalid entries are skipped with a warning; a broken file falls back
+in memory to the presets without overwriting your file.
 
 ## Development
 
@@ -96,7 +127,7 @@ launcher in its Startup folder, and lock policies down with
    pip install pyinstaller
    pyinstaller --onefile --windowed --name Kiosk kiosk_launcher.py
    ```
-2. Copy `Kiosk.exe` + `kiosk_config.json` to `C:\Kiosk\`.
+2. Copy `Kiosk.exe` (and optionally a customized `apps.json`) to `C:\Kiosk\`.
 3. Set the shell **for the Student account only** (keeps an admin escape
    hatch — do NOT set the HKLM value or you can lock yourself out):
    ```
@@ -118,15 +149,22 @@ launcher in its Startup folder, and lock policies down with
 
 ## Config reference (`kiosk_config.json`)
 
+Settings + password only (the app list is in `apps.json`):
+
 ```jsonc
 {
   "password": { "salt": "...", "hash": "...", "iterations": 200000 },
   "fullscreen": false,          // true = start in kiosk mode
-  "columns": 4,                 // buttons per row
-  "apps": [
-    { "name": "GIMP", "patterns": ["gimp(?:\\.exe)?$"], "args": [] }
-  ]
+  "columns": 4                  // buttons per row
 }
+```
+
+App templates (`apps.json`):
+
+```jsonc
+[
+  { "name": "GIMP", "patterns": ["gimp(?:\\.exe)?$"], "args": [] }
+]
 ```
 
 ## License
