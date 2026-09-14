@@ -130,6 +130,147 @@
     "args": []
   },
   {
+    "name": "Thonny",
+    "patterns": [
+      "thonnyw?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Mu Editor",
+    "patterns": [
+      "(?:^|[\\\\/])mu(?:-editor)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Sonic Pi",
+    "patterns": [
+      "sonic-?pi(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Arduino IDE",
+    "patterns": [
+      "arduino(?:[ -]?ide)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Processing",
+    "patterns": [
+      "processing(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "DrRacket",
+    "patterns": [
+      "drracket(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Greenfoot",
+    "patterns": [
+      "greenfoot(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "BlueJ",
+    "patterns": [
+      "bluej(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "OpenSCAD",
+    "patterns": [
+      "openscad(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Krita",
+    "patterns": [
+      "krita(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Inkscape",
+    "patterns": [
+      "inkscape(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Tux Paint",
+    "patterns": [
+      "tuxpaint(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "GeoGebra",
+    "patterns": [
+      "geogebra(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Stellarium",
+    "patterns": [
+      "stellarium(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "wxMaxima",
+    "patterns": [
+      "wxmaxima(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "FreeCAD",
+    "patterns": [
+      "freecad(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "LibreCAD",
+    "patterns": [
+      "librecad(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Fritzing",
+    "patterns": [
+      "fritzing(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Anki",
+    "patterns": [
+      "anki(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "MuseScore",
+    "patterns": [
+      "musescore[0-9.]*(?:\\.exe)?$",
+      "mscore[0-9.]*(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
     "name": "VirtualBox",
     "patterns": [
       "virtualbox(?:\\.exe)?$"

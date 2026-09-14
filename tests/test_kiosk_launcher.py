@@ -316,6 +316,56 @@ class TestBuiltinPresets(unittest.TestCase):
         self.assertEqual(found, [])
         self.assertEqual(missing, ["VirtualBox"])
 
+    def test_arduino_matches_ide_and_ignores_cli(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "Arduino IDE"]
+        candidates = {
+            r"C:\Program Files\Arduino IDE\Arduino IDE.exe",
+            "/usr/bin/arduino",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+        # the CLI tool must not match
+        candidates = {r"C:\arduino-cli.exe"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["Arduino IDE"])
+
+    def test_musescore_matches_versioned_exe(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "MuseScore"]
+        candidates = {
+            r"C:\Program Files\MuseScore 4\bin\MuseScore4.exe",
+            "/usr/bin/mscore",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+
+    def test_mu_editor_matches_and_ignores_emu(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "Mu Editor"]
+        candidates = {r"C:\Users\kid\AppData\Local\Programs\Mu Editor\Mu.exe"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+        # "emu.exe" must not match the anchored "mu" pattern
+        candidates = {r"C:\tools\emu.exe"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["Mu Editor"])
+
+    def test_no_browser_or_game_presets(self):
+        names = {a["name"].lower() for a in k.BUILTIN_APPS}
+        for banned in (
+            "firefox", "chrome", "chromium", "edge", "opera", "brave",
+            "minecraft", "steam", "roblox", "epic games",
+        ):
+            self.assertNotIn(banned, names)
+
 
 class TestAddRemoveApps(unittest.TestCase):
     def test_add_app_appends_normalized(self):

@@ -146,6 +146,110 @@ BUILTIN_APPS = [
         "patterns": [r"(?:^|[\\/])mupdf(?:-gl)?(?:\.exe)?$"],
         "args": [],
     },
+    # Educational / creative coding
+    {
+        "name": "Thonny",
+        "patterns": [r"thonnyw?(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Mu Editor",
+        "patterns": [r"(?:^|[\\/])mu(?:-editor)?(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Sonic Pi",
+        "patterns": [r"sonic-?pi(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Arduino IDE",
+        "patterns": [r"arduino(?:[ -]?ide)?(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Processing",
+        "patterns": [r"processing(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "DrRacket",
+        "patterns": [r"drracket(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Greenfoot",
+        "patterns": [r"greenfoot(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "BlueJ",
+        "patterns": [r"bluej(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "OpenSCAD",
+        "patterns": [r"openscad(?:\.exe)?$"],
+        "args": [],
+    },
+    # Art & design
+    {
+        "name": "Krita",
+        "patterns": [r"krita(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Inkscape",
+        "patterns": [r"inkscape(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Tux Paint",
+        "patterns": [r"tuxpaint(?:\.exe)?$"],
+        "args": [],
+    },
+    # Math & science
+    {
+        "name": "GeoGebra",
+        "patterns": [r"geogebra(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Stellarium",
+        "patterns": [r"stellarium(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "wxMaxima",
+        "patterns": [r"wxmaxima(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "FreeCAD",
+        "patterns": [r"freecad(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "LibreCAD",
+        "patterns": [r"librecad(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Fritzing",
+        "patterns": [r"fritzing(?:\.exe)?$"],
+        "args": [],
+    },
+    # Study & music
+    {
+        "name": "Anki",
+        "patterns": [r"anki(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "MuseScore",
+        "patterns": [r"musescore[0-9.]*(?:\.exe)?$", r"mscore[0-9.]*(?:\.exe)?$"],
+        "args": [],
+    },
     # Virtualization
     {
         "name": "VirtualBox",
@@ -175,6 +279,26 @@ EMOJI = {
     "okular": "\U0001F4D6",
     "mupdf": "\U0001F4D1",
     "virtualbox": "\U0001F4E6",
+    "thonny": "\U0001F40D",
+    "mu editor": "\u270F\uFE0F",
+    "sonic pi": "\U0001F3B5",
+    "arduino ide": "\U0001F50C",
+    "processing": "\U0001F300",
+    "drracket": "\U0001F9EE",
+    "greenfoot": "\U0001F998",
+    "bluej": "\u2615",
+    "openscad": "\u2699\uFE0F",
+    "krita": "\U0001F58C\uFE0F",
+    "inkscape": "\U0001F58B\uFE0F",
+    "tux paint": "\U0001F427",
+    "geogebra": "\U0001F4D0",
+    "stellarium": "\U0001F52D",
+    "wxmaxima": "\u2797",
+    "freecad": "\U0001F4CF",
+    "librecad": "\U0001F58A\uFE0F",
+    "fritzing": "\U0001F50B",
+    "anki": "\U0001F0CF",
+    "musescore": "\U0001F3BC",
 }
 DEFAULT_EMOJI = "\U0001F680"
 

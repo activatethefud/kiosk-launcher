@@ -7,10 +7,13 @@ more apps by regex.
 
 ## Features
 
-- **Presets:** LibreOffice, Word, Scratch, VS Code, VSCodium, GIMP — plus
-  FOSS video editors (Kdenlive, Shotcut, OpenShot, Olive, Avidemux, Blender),
-  audio tools (Audacity, Ardour, LMMS), PDF viewers (SumatraPDF, Okular,
-  MuPDF), and VirtualBox
+- **Presets:** LibreOffice, Word, Scratch, VS Code, VSCodium, GIMP — plus FOSS
+  video editors (Kdenlive, Shotcut, OpenShot, Olive, Avidemux, Blender), audio
+  tools (Audacity, Ardour, LMMS), PDF viewers (SumatraPDF, Okular, MuPDF),
+  VirtualBox, and educational software (Thonny, Mu Editor, Sonic Pi,
+  Arduino IDE, Processing, DrRacket, Greenfoot, BlueJ, OpenSCAD, Krita,
+  Inkscape, Tux Paint, GeoGebra, Stellarium, wxMaxima, FreeCAD, LibreCAD,
+  Fritzing, Anki, MuseScore). No browsers or games.
 - **Dynamic discovery** (no hard-coded paths):
   - *Windows:* `PATH`, `Program Files`, `Program Files (x86)`, `ProgramData`,
     `%LOCALAPPDATA%\Programs`, Windows "App Paths" registry, Store app aliases
