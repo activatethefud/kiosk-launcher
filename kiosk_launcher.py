@@ -294,6 +294,28 @@ def save_apps(apps, path):
         json.dump(apps, f, indent=2, ensure_ascii=False)
 
 
+def add_app(apps, entry):
+    """Append a normalized app template to the list (in place)."""
+    clean = normalize_app(entry)
+    if clean is None:
+        raise ValueError(
+            "invalid app entry: needs a 'name' and non-empty 'patterns'"
+        )
+    apps.append(clean)
+    return apps
+
+
+def remove_apps(apps, names):
+    """Remove apps by display name (case-insensitive). Returns count removed."""
+    if isinstance(names, str):
+        names = [names]
+    lowered = {n.strip().lower() for n in names if isinstance(n, str) and n.strip()}
+    kept = [a for a in apps if a.get("name", "").lower() not in lowered]
+    removed = len(apps) - len(kept)
+    apps[:] = kept
+    return removed
+
+
 # ==========================================================================
 # Password handling
 # ==========================================================================
@@ -314,6 +336,14 @@ def verify_password(password, pw_cfg):
         "sha256", password.encode("utf-8"), bytes.fromhex(salt), iterations
     )
     return secrets.compare_digest(candidate.hex(), digest)
+
+
+def set_password(cfg, new_password):
+    """Replace cfg["password"] with a fresh hash of new_password (in place)."""
+    cfg["password"] = dict(
+        zip(("salt", "hash", "iterations"), hash_password(new_password))
+    )
+    return cfg
 
 
 # ==========================================================================
@@ -480,6 +510,7 @@ def discover_apps(apps):
     found, missing = [], []
     for app in apps:
         try:
+            # Case-insensitive: a candidate "GIMP.EXE" matches pattern "gimp".
             pats = [re.compile(p, re.IGNORECASE) for p in app["patterns"]]
         except re.error as e:
             print(f"WARNING: bad regex in '{app['name']}': {e}", file=sys.stderr)
@@ -556,7 +587,7 @@ def cmd_set_password(args):
     if len(pw1) < 1:
         print("Password must not be empty.", file=sys.stderr)
         sys.exit(1)
-    cfg["password"] = dict(zip(("salt", "hash", "iterations"), hash_password(pw1)))
+    set_password(cfg, pw1)
     save_config(cfg, path)
     print(f"Password updated in {path}")
 
@@ -822,7 +853,7 @@ def run_gui(args):
         def add_app(self):
             dlg = AddAppDialog(self)
             if dlg.exec() == QDialog.Accepted:
-                self.apps.append(dlg.values())
+                add_app(self.apps, dlg.values())
                 save_apps(self.apps, self.apps_path)
                 self._ensure_watched()
                 self.rebuild()
@@ -833,8 +864,8 @@ def run_gui(args):
                 selected = dlg.selected()
                 if not selected:
                     return
-                names = {a["name"] for a in selected}
-                self.apps = [a for a in self.apps if a["name"] not in names]
+                names = [a["name"] for a in selected]
+                remove_apps(self.apps, names)
                 save_apps(self.apps, self.apps_path)
                 self._ensure_watched()
                 self.rebuild()
@@ -856,9 +887,7 @@ def run_gui(args):
             if not new1:
                 QMessageBox.warning(self, "Empty", "Password must not be empty.")
                 return
-            self.cfg["password"] = dict(
-                zip(("salt", "hash", "iterations"), hash_password(new1))
-            )
+            set_password(self.cfg, new1)
             save_config(self.cfg, self.cfg_path)
             QMessageBox.information(self, "Done", "Password updated.")
 

@@ -204,6 +204,22 @@ class TestDiscovery(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertEqual(missing, [])
 
+    def test_uppercase_pattern_matches_lowercase_candidate(self):
+        candidates = {"/usr/bin/gimp"}
+        apps = [{"name": "G", "patterns": [r"GIMP$"], "args": []}]
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, _ = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+
+    def test_mixed_case_windows_path_matches(self):
+        candidates = {r"C:\Program Files\GIMP 2\bin\GIMP-2.10.EXE"}
+        apps = [
+            {"name": "G", "patterns": [r"gimp(?:[._-]?[\d.]+)?(?:\.exe)?$"], "args": []}
+        ]
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, _ = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+
     def test_args_are_passed_through(self):
         candidates = {"/usr/bin/app"}
         apps = [{"name": "A", "patterns": ["app$"], "args": ["--flag"]}]
@@ -280,6 +296,66 @@ class TestBuiltinPresets(unittest.TestCase):
             found, missing = k.discover_apps(apps)
         self.assertEqual(found, [])
         self.assertEqual(missing, ["MuPDF"])
+
+
+class TestAddRemoveApps(unittest.TestCase):
+    def test_add_app_appends_normalized(self):
+        apps = []
+        k.add_app(apps, {"name": "GIMP", "patterns": "gimp$", "args": "--flag"})
+        self.assertEqual(len(apps), 1)
+        self.assertEqual(apps[0]["name"], "GIMP")
+        self.assertEqual(apps[0]["patterns"], ["gimp$"])
+        self.assertEqual(apps[0]["args"], ["--flag"])
+
+    def test_add_app_rejects_invalid(self):
+        apps = []
+        with self.assertRaises(ValueError):
+            k.add_app(apps, {"name": "", "patterns": ["x$"]})
+        with self.assertRaises(ValueError):
+            k.add_app(apps, {"name": "X", "patterns": []})
+        self.assertEqual(apps, [])
+
+    def test_remove_apps_by_name(self):
+        apps = [
+            {"name": "GIMP", "patterns": ["gimp$"], "args": []},
+            {"name": "Scratch", "patterns": ["scratch$"], "args": []},
+        ]
+        removed = k.remove_apps(apps, ["gimp"])  # case-insensitive
+        self.assertEqual(removed, 1)
+        self.assertEqual([a["name"] for a in apps], ["Scratch"])
+
+    def test_remove_apps_is_case_insensitive(self):
+        apps = [{"name": "GIMP", "patterns": ["gimp$"], "args": []}]
+        k.remove_apps(apps, ["Gimp"])
+        self.assertEqual(apps, [])
+
+    def test_remove_apps_accepts_single_string(self):
+        apps = [
+            {"name": "A", "patterns": ["a$"], "args": []},
+            {"name": "B", "patterns": ["b$"], "args": []},
+        ]
+        k.remove_apps(apps, "B")
+        self.assertEqual([a["name"] for a in apps], ["A"])
+
+    def test_remove_apps_missing_name_is_noop(self):
+        apps = [{"name": "A", "patterns": ["a$"], "args": []}]
+        removed = k.remove_apps(apps, ["nope"])
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(apps), 1)
+
+
+class TestSetPassword(unittest.TestCase):
+    def test_set_password_updates_and_verifies(self):
+        cfg = k.seed_config()
+        k.set_password(cfg, "newpass")
+        self.assertTrue(k.verify_password("newpass", cfg["password"]))
+        self.assertFalse(k.verify_password(k.DEFAULT_PASSWORD, cfg["password"]))
+
+    def test_set_password_changes_salt(self):
+        cfg = k.seed_config()
+        old_salt = cfg["password"]["salt"]
+        k.set_password(cfg, "newpass")
+        self.assertNotEqual(old_salt, cfg["password"]["salt"])
 
 
 class TestWalkDepth(unittest.TestCase):

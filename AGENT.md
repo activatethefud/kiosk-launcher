@@ -56,14 +56,19 @@ Top-level functions (module `kiosk_launcher`):
 - `seed_config()` / `load_config(path)` / `save_config(cfg, path)` — settings +
   password I/O (no app data). `load_config` repairs missing keys and is
   idempotent. Config is JSON.
-- `normalize_app(entry)` / `load_apps(path)` / `save_apps(apps, path)` — the
-  app list lives in `apps.json` (source of truth). `normalize_app` coerces
-  string patterns/args to lists and drops invalid entries. `load_apps` seeds
-  the file from `BUILTIN_APPS` when absent, falls back to presets in memory on
-  parse errors (without overwriting the user's file), and respects an
-  explicitly empty list.
-- `hash_password(pw, salt=None, iterations=200_000)` / `verify_password(pw, pw_cfg)` —
-  PBKDF2-HMAC-SHA256, random salt via `secrets`, constant-time compare.
+- `normalize_app(entry)` / `load_apps(path)` / `save_apps(apps, path)` /
+  `add_app(apps, entry)` / `remove_apps(apps, names)` — the app list lives in
+  `apps.json` (source of truth). `normalize_app` coerces string patterns/args
+  to lists and drops invalid entries. `load_apps` seeds the file from
+  `BUILTIN_APPS` when absent, falls back to presets in memory on parse errors
+  (without overwriting the user's file), and respects an explicitly empty
+  list. `add_app` appends a normalized entry (raising `ValueError` on invalid
+  input); `remove_apps` removes by name case-insensitively and returns the
+  count removed.
+- `hash_password(pw, salt=None, iterations=200_000)` / `verify_password(pw, pw_cfg)` /
+  `set_password(cfg, new_password)` — PBKDF2-HMAC-SHA256, random salt via
+  `secrets`, constant-time compare; `set_password` replaces the stored hash
+  in place.
 - `gather_candidates()` — returns a `set` of normalized executable paths,
   platform-specific (see "Discovery" below).
 - `discover_apps(apps)` — takes the app template list (NOT the config); returns
