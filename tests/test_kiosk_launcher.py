@@ -6,6 +6,7 @@
 
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -227,6 +228,58 @@ class TestDiscovery(unittest.TestCase):
             with mock.patch.dict(os.environ, {"PATH": tmp}):
                 candidates = k.gather_candidates()
         self.assertIn(exe, candidates)
+
+
+class TestBuiltinPresets(unittest.TestCase):
+    def test_all_builtin_patterns_compile(self):
+        for app in k.BUILTIN_APPS:
+            for p in app["patterns"]:
+                re.compile(p)  # raises if invalid
+
+    def test_vscodium_matches_windows_exe(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "VSCodium"]
+        candidates = {
+            r"C:\Users\kid\AppData\Local\Programs\VSCodium\VSCodium.exe"
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+
+    def test_gimp_matches_versioned_windows_exe(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "GIMP"]
+        candidates = {r"C:\Program Files\GIMP 2\bin\gimp-2.10.exe"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+
+    def test_gimp_ignores_console_variant(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "GIMP"]
+        candidates = {r"C:\Program Files\GIMP 2\bin\gimp-console-2.10.exe"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["GIMP"])
+
+    def test_mupdf_matches_viewer_not_pymupdf(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "MuPDF"]
+        candidates = {
+            r"C:\Program Files\MuPDF\mupdf-gl.exe",
+            "/usr/bin/mupdf",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+
+    def test_mupdf_ignores_pymupdf_cli(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "MuPDF"]
+        candidates = {"/home/user/.local/bin/pymupdf"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["MuPDF"])
 
 
 class TestWalkDepth(unittest.TestCase):

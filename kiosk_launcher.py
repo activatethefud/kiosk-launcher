@@ -50,11 +50,18 @@ DEFAULT_PASSWORD = "admin"
 # against each discovered executable's full path.
 # --------------------------------------------------------------------------
 BUILTIN_APPS = [
+    # Office / general
     {
         "name": "LibreOffice",
         "patterns": [r"soffice(?:\.exe)?$", r"libreoffice(?:\.exe)?$"],
         "args": [],
     },
+    {
+        "name": "Microsoft Word",
+        "patterns": [r"winword(?:\.exe)?$"],
+        "args": [],
+    },
+    # Coding / creativity
     {
         "name": "Scratch",
         "patterns": [r"scratch(?: ?3|desktop|2)?(?:\.exe)?$"],
@@ -67,12 +74,76 @@ BUILTIN_APPS = [
     },
     {
         "name": "VSCodium",
-        "patterns": [r"(?:^|[\\/])codium(?:\.exe)?$"],
+        "patterns": [r"codium(?:\.exe)?$", r"vscodium(?:\.exe)?$"],
+        "args": [],
+    },
+    # Graphics
+    {
+        "name": "GIMP",
+        "patterns": [r"gimp(?:[._-]?[\d.]+)?(?:\.exe)?$", r"gimpportable(?:\.exe)?$"],
+        "args": [],
+    },
+    # Video editing (FOSS)
+    {
+        "name": "Kdenlive",
+        "patterns": [r"kdenlive(?:\.exe)?$"],
         "args": [],
     },
     {
-        "name": "Microsoft Word",
-        "patterns": [r"winword(?:\.exe)?$"],
+        "name": "Shotcut",
+        "patterns": [r"shotcut(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "OpenShot",
+        "patterns": [r"openshot-qt(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Olive",
+        "patterns": [r"olive(?:-editor)?(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Avidemux",
+        "patterns": [r"avidemux(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Blender",
+        "patterns": [r"blender(?:\.exe)?$"],
+        "args": [],
+    },
+    # Audio editing (FOSS)
+    {
+        "name": "Audacity",
+        "patterns": [r"audacity(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Ardour",
+        "patterns": [r"ardour[0-9]*(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "LMMS",
+        "patterns": [r"lmms(?:\.exe)?$"],
+        "args": [],
+    },
+    # PDF viewers (FOSS)
+    {
+        "name": "SumatraPDF",
+        "patterns": [r"sumatrapdf(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Okular",
+        "patterns": [r"okular(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "MuPDF",
+        "patterns": [r"(?:^|[\\/])mupdf(?:-gl)?(?:\.exe)?$"],
         "args": [],
     },
 ]
@@ -80,10 +151,23 @@ BUILTIN_APPS = [
 # Friendly icons shown on the buttons (cosmetic only).
 EMOJI = {
     "libreoffice": "\U0001F4DD",
+    "microsoft word": "\U0001F4C4",
     "scratch": "\U0001F431",
     "visual studio code": "\U0001F5A5\uFE0F",
-    "vscodium": "\U0001F489",
-    "microsoft word": "\U0001F4C4",
+    "vscodium": "\U0001F4A0",
+    "gimp": "\U0001F3A8",
+    "kdenlive": "\U0001F3AC",
+    "shotcut": "\u2702\uFE0F",
+    "openshot": "\U0001F39E\uFE0F",
+    "olive": "\U0001F3A5",
+    "avidemux": "\U0001F4FD\uFE0F",
+    "blender": "\U0001F9CA",
+    "audacity": "\U0001F3A7",
+    "ardour": "\U0001F39B\uFE0F",
+    "lmms": "\U0001F3B9",
+    "sumatrapdf": "\U0001F4D5",
+    "okular": "\U0001F4D6",
+    "mupdf": "\U0001F4D1",
 }
 DEFAULT_EMOJI = "\U0001F680"
 

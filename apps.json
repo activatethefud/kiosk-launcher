@@ -8,6 +8,13 @@
     "args": []
   },
   {
+    "name": "Microsoft Word",
+    "patterns": [
+      "winword(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
     "name": "Scratch",
     "patterns": [
       "scratch(?: ?3|desktop|2)?(?:\\.exe)?$"
@@ -25,14 +32,100 @@
   {
     "name": "VSCodium",
     "patterns": [
-      "(?:^|[\\\\/])codium(?:\\.exe)?$"
+      "codium(?:\\.exe)?$",
+      "vscodium(?:\\.exe)?$"
     ],
     "args": []
   },
   {
-    "name": "Microsoft Word",
+    "name": "GIMP",
     "patterns": [
-      "winword(?:\\.exe)?$"
+      "gimp(?:[._-]?[\\d.]+)?(?:\\.exe)?$",
+      "gimpportable(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Kdenlive",
+    "patterns": [
+      "kdenlive(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Shotcut",
+    "patterns": [
+      "shotcut(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "OpenShot",
+    "patterns": [
+      "openshot-qt(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Olive",
+    "patterns": [
+      "olive(?:-editor)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Avidemux",
+    "patterns": [
+      "avidemux(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Blender",
+    "patterns": [
+      "blender(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Audacity",
+    "patterns": [
+      "audacity(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Ardour",
+    "patterns": [
+      "ardour[0-9]*(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "LMMS",
+    "patterns": [
+      "lmms(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "SumatraPDF",
+    "patterns": [
+      "sumatrapdf(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Okular",
+    "patterns": [
+      "okular(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "MuPDF",
+    "patterns": [
+      "(?:^|[\\\\/])mupdf(?:-gl)?(?:\\.exe)?$"
     ],
     "args": []
   }
