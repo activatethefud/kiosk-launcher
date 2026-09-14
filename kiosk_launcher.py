@@ -693,6 +693,7 @@ def launch(app):
 # ==========================================================================
 # Virtual-key codes (Windows). Plain ints used only for the blocking decision.
 VK_TAB = 0x09
+VK_SHIFT = 0x10
 VK_CONTROL = 0x11
 VK_ESCAPE = 0x1B
 VK_SPACE = 0x20
@@ -700,6 +701,8 @@ VK_DELETE = 0x2E
 VK_LWIN = 0x5B
 VK_RWIN = 0x5C
 VK_F4 = 0x73
+VK_LSHIFT = 0xA0
+VK_RSHIFT = 0xA1
 
 
 def is_blocked_hotkey(vk, alt_down, ctrl_down):
@@ -709,7 +712,12 @@ def is_blocked_hotkey(vk, alt_down, ctrl_down):
     Ctrl+Shift+Esc (Task Manager), Alt+Space, and Alt+F4. Also flags
     Ctrl+Alt+Del for blocking, though Windows delivers the Secure Attention
     Sequence to winlogon (not to this hook) — disable it via policy too.
+
+    Alt+Shift (language/layout switching) is explicitly allowed.
     """
+    # Allow Alt+Shift — the standard Windows language/layout switch.
+    if alt_down and vk in (VK_SHIFT, VK_LSHIFT, VK_RSHIFT):
+        return False
     if vk in (VK_LWIN, VK_RWIN):
         return True
     if vk == VK_ESCAPE and (alt_down or ctrl_down):

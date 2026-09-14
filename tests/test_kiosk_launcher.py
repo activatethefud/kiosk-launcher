@@ -389,6 +389,12 @@ class TestHotkeyBlocking(unittest.TestCase):
         # Plain Esc is handled by the app itself (admin prompt), not the hook.
         self.assertFalse(k.is_blocked_hotkey(k.VK_ESCAPE, False, False))
 
+    def test_alt_shift_allowed_for_language_switch(self):
+        for vk in (k.VK_SHIFT, k.VK_LSHIFT, k.VK_RSHIFT):
+            self.assertFalse(
+                k.is_blocked_hotkey(vk, alt_down=True, ctrl_down=False)
+            )
+
     def test_alt_f4_blocked(self):
         self.assertTrue(k.is_blocked_hotkey(0x73, alt_down=True, ctrl_down=False))
 

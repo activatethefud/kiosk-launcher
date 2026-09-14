@@ -169,6 +169,9 @@ In `--kiosk` mode, escape attempts ask for the admin password instead:
 - **Everywhere:** **Esc** and **F11** on the launcher itself prompt for the
   password rather than exiting.
 
+**Alt+Shift** (language/layout switching) is explicitly allowed so students
+can switch keyboard layouts; everything else listed above is blocked.
+
 > **Ctrl+Alt+Del cannot be intercepted by any application** — it's the Windows
 > Secure Attention Sequence, handled by winlogon before hooks see it. Neuter
 > the CAD screen instead: disable Task Manager, Lock, and Change Password via
