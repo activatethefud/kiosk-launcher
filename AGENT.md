@@ -75,7 +75,8 @@ Top-level functions (module `kiosk_launcher`):
   via `cmd /c start`.
 - `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
   password prompts, and close/keyboard handling. Admin add/remove app edits
-  the in-memory app list and calls `save_apps`.
+  the in-memory app list and calls `save_apps`. A `QFileSystemWatcher` +
+  debounced `QTimer` live-reloads `apps.json` when it changes on disk.
 - CLI modes: `cmd_scan(args)`, `cmd_set_password(args)`.
 
 ### Discovery (the important part)

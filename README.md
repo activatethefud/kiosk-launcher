@@ -95,6 +95,9 @@ first run (or whenever it's missing), the launcher seeds it from the built-in
 presets. Invalid entries are skipped with a warning; a broken file falls back
 in memory to the presets without overwriting your file.
 
+The running launcher **watches `apps.json` and reloads it automatically** a
+moment after you save — no restart needed.
+
 ## Development
 
 ```bash

@@ -42,7 +42,7 @@ import subprocess
 import sys
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
@@ -482,7 +482,7 @@ def cmd_set_password(args):
 # ==========================================================================
 def run_gui(args):
     try:
-        from PySide6.QtCore import Qt, QPoint, QTimer
+        from PySide6.QtCore import Qt, QPoint, QTimer, QFileSystemWatcher
         from PySide6.QtWidgets import (
             QApplication,
             QDialog,
@@ -656,6 +656,34 @@ def run_gui(args):
             self.resize(1000, 700)
             self.rebuild()
 
+            # Live-reload apps.json whenever it changes on disk.
+            self._reload_timer = QTimer(self)
+            self._reload_timer.setSingleShot(True)
+            self._reload_timer.setInterval(400)
+            self._reload_timer.timeout.connect(self._reload_apps)
+            self._watcher = QFileSystemWatcher(self)
+            self._watcher.fileChanged.connect(self._schedule_reload)
+            self._ensure_watched()
+
+        def _schedule_reload(self, changed_path=None):
+            # Debounce: editors may write the file multiple times (or replace
+            # it atomically), firing several change events in quick succession.
+            self._reload_timer.start()
+
+        def _ensure_watched(self):
+            if self.apps_path and os.path.exists(self.apps_path):
+                if self.apps_path not in self._watcher.files():
+                    self._watcher.addPath(self.apps_path)
+
+        def _reload_apps(self):
+            self.apps, self.apps_path = load_apps(self.apps_path)
+            self._ensure_watched()
+            self.rebuild()
+            self.status_label.setText(
+                f"Reloaded {len(self.apps)} app templates from "
+                f"{os.path.basename(self.apps_path)}"
+            )
+
         def rebuild(self):
             while self.grid.count():
                 item = self.grid.takeAt(0)
@@ -712,6 +740,7 @@ def run_gui(args):
             if dlg.exec() == QDialog.Accepted:
                 self.apps.append(dlg.values())
                 save_apps(self.apps, self.apps_path)
+                self._ensure_watched()
                 self.rebuild()
 
         def remove_app(self):
@@ -723,6 +752,7 @@ def run_gui(args):
                 names = {a["name"] for a in selected}
                 self.apps = [a for a in self.apps if a["name"] not in names]
                 save_apps(self.apps, self.apps_path)
+                self._ensure_watched()
                 self.rebuild()
 
         def change_password(self):
