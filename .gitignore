@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# runtime-generated, machine-specific (contains password hash + discovered config)
+kiosk_config.json
+
+# PyInstaller artifacts
+build/
+dist/
+*.spec

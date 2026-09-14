@@ -1,0 +1,102 @@
+# AGENT.md — guidance for AI coding agents working on this repository
+
+## What this project is
+
+A **single-file, cross-platform kiosk launcher** for school/classroom computers
+(Linux + Windows). It dynamically discovers installed applications, shows them
+as big buttons, and provides a password-protected admin area to add apps by
+regex. It is designed to be usable as a Windows custom shell (replacing
+`explorer.exe`) but runs on Linux for development/testing.
+
+File layout:
+
+```
+kiosk_launcher.py      # the entire application
+tests/test_kiosk_launcher.py
+README.md              # user-facing docs + Windows shell deployment recipe
+AGENT.md               # this file
+kiosk_config.json      # runtime-generated, GITIGNORED (auto-created on first run)
+```
+
+## Commands
+
+```bash
+python3 kiosk_launcher.py                    # run windowed (dev)
+python3 kiosk_launcher.py --kiosk            # frameless fullscreen (locked)
+python3 kiosk_launcher.py --scan             # print discovery results, no GUI
+python3 kiosk_launcher.py --set-password     # change admin password (interactive)
+python3 kiosk_launcher.py --config PATH      # use a specific config file
+
+# tests (stdlib unittest; also runnable with pytest)
+python3 -m unittest discover -s tests -v
+
+# compile check
+python3 -m py_compile kiosk_launcher.py
+
+# headless GUI smoke test
+QT_QPA_PLATFORM=offscreen python3 kiosk_launcher.py --smoke
+```
+
+## Dependencies
+
+- **Runtime GUI:** PySide6 (Qt 6) only. It is imported lazily inside
+  `run_gui()`, so `--scan` and `--set-password` work with the stdlib alone.
+- **Tests:** stdlib `unittest` + `unittest.mock` only. No pytest required.
+
+## Architecture
+
+Top-level functions (module `kiosk_launcher`):
+
+- `BUILTIN_APPS` — presets; each entry is `{"name", "patterns": [regex...], "args"}`.
+  Regexes are matched **case-insensitively** against candidate exe **full paths**
+  with `re.search`. Always anchor to the filename with `$`.
+- `seed_config()` / `load_config(path)` / `save_config(cfg, path)` — config I/O.
+  `load_config` repairs missing keys and is idempotent. Config is JSON.
+- `hash_password(pw, salt=None, iterations=200_000)` / `verify_password(pw, pw_cfg)` —
+  PBKDF2-HMAC-SHA256, random salt via `secrets`, constant-time compare.
+- `gather_candidates()` — returns a `set` of normalized executable paths,
+  platform-specific (see "Discovery" below).
+- `discover_apps(cfg)` — returns `(found, missing)` where `found` is a list of
+  `{"name", "path", "args"}` and `missing` is a list of names. A bad regex in
+  config is reported as missing (with a stderr warning) rather than crashing.
+- `launch(app)` — `subprocess.Popen`, non-blocking; returns `None` or an error
+  string. Windows Store aliases (paths containing `WindowsApps`) are launched
+  via `cmd /c start`.
+- `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
+  password prompts, and close/keyboard handling.
+- CLI modes: `cmd_scan(args)`, `cmd_set_password(args)`.
+
+### Discovery (the important part)
+
+`gather_candidates()` must not assume install locations:
+
+- **Windows:** `PATH` dirs, `ProgramFiles`, `ProgramFiles(x86)`, `ProgramData`,
+  `%LOCALAPPDATA%\Programs`, `%LOCALAPPDATA%\Microsoft\WindowsApps`,
+  plus the `App Paths` registry key (HKLM 64/32 + HKCU).
+- **Linux:** `PATH` dirs, `/opt`, `/usr/local/bin`, `/snap/bin`, flatpak export
+  dirs, `~/.local/bin`, `~/Applications`, plus binary paths parsed from
+  `.desktop` files (`Exec=` field).
+
+## Conventions
+
+- Keep the launcher a **single file**. If you add a dependency, justify it; the
+  only sanctioned runtime dependency is PySide6.
+- Guard Windows-only code with `os.name == "nt"`; never hard-code paths.
+- Cross-platform strings/args: use `shlex.split(posix=(os.name == "posix"))`.
+- Config is **not** committed (gitignored). Do not commit real password hashes.
+- When adding a preset, add it to `BUILTIN_APPS` with filename-anchored regexes.
+- Tests: prefer `mock.patch.object(kiosk_launcher, "gather_candidates", ...)`
+  for discovery tests so they are deterministic and machine-independent.
+- New behavior should come with a test in `tests/test_kiosk_launcher.py`.
+
+## Deployment notes (Windows custom shell)
+
+Freeze with PyInstaller (`--onefile --windowed`), then set the shell per-user:
+
+```
+reg add "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "C:\Kiosk\Kiosk.exe" /f
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableTaskMgr /t REG_DWORD /d 1 /f
+```
+
+See README.md for the full recipe, including why the **HKLM** shell value must
+be avoided and why an admin escape-hatch account is required.
