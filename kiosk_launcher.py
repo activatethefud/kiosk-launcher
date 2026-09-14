@@ -696,23 +696,27 @@ VK_TAB = 0x09
 VK_CONTROL = 0x11
 VK_ESCAPE = 0x1B
 VK_SPACE = 0x20
+VK_DELETE = 0x2E
 VK_LWIN = 0x5B
 VK_RWIN = 0x5C
+VK_F4 = 0x73
 
 
 def is_blocked_hotkey(vk, alt_down, ctrl_down):
     """True if this keydown combo is an escape hotkey that should be blocked.
 
     Blocks: Win key (all Win+... shortcuts), Alt+Tab, Alt+Esc, Ctrl+Esc,
-    Ctrl+Shift+Esc (Task Manager), and Alt+Space. Alt+F4 is NOT blocked here:
-    the launcher handles it via its close event, and launched apps may
-    legitimately close with Alt+F4.
+    Ctrl+Shift+Esc (Task Manager), Alt+Space, and Alt+F4. Also flags
+    Ctrl+Alt+Del for blocking, though Windows delivers the Secure Attention
+    Sequence to winlogon (not to this hook) — disable it via policy too.
     """
     if vk in (VK_LWIN, VK_RWIN):
         return True
     if vk == VK_ESCAPE and (alt_down or ctrl_down):
         return True
-    if alt_down and vk in (VK_TAB, VK_SPACE):
+    if alt_down and vk in (VK_TAB, VK_SPACE, VK_F4):
+        return True
+    if vk == VK_DELETE and alt_down and ctrl_down:
         return True
     return False
 
@@ -800,7 +804,7 @@ if os.name == "nt":
                         vk = kb.vkCode
                         alt = bool(kb.flags & LLKHF_ALTDOWN)
                         ctrl = False
-                        if vk == VK_ESCAPE:
+                        if vk in (VK_ESCAPE, VK_DELETE):
                             ctrl = bool(
                                 _user32.GetAsyncKeyState(VK_CONTROL) & 0x8000
                             )

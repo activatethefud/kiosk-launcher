@@ -14,8 +14,10 @@ File layout:
 kiosk_launcher.py      # the entire application
 tests/test_kiosk_launcher.py
 apps.json              # app search templates (editable, copyable, TRACKED in git)
+kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
 README.md              # user-facing docs + Windows shell deployment recipe
 AGENT.md               # this file
+.gitattributes         # CRLF for *.bat on checkout
 kiosk_config.json      # runtime-generated settings + password, GITIGNORED
 ```
 
@@ -82,9 +84,10 @@ Top-level functions (module `kiosk_launcher`):
   only) — kiosk escape-hotkey blocking. `is_blocked_hotkey` is a pure,
   cross-platform decision function (unit-tested). `KioskHotkeyBlocker` installs
   a `WH_KEYBOARD_LL` ctypes hook on a background thread that swallows the Win
-  key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc and Alt+Space, and calls a
-  callback (which emits a Qt signal → password prompt) for each blocked combo.
-  Ctrl+Alt+Del cannot be hooked and must be disabled via policy.
+  key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc, Alt+Space and Alt+F4, and
+  calls a callback (which emits a Qt signal → password prompt) for each blocked
+  combo. Ctrl+Alt+Del is flagged but Windows delivers the SAS to winlogon, not
+  the hook — disable Task Manager/lock/change-password via policy instead.
 - `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
   password prompts, and close/keyboard handling. Admin add/remove app edits
   the in-memory app list and calls `save_apps`. A `QFileSystemWatcher` +
@@ -128,3 +131,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v Disa
 
 See README.md for the full recipe, including why the **HKLM** shell value must
 be avoided and why an admin escape-hatch account is required.
+
+For the simpler "run on top of Windows" deployment, use `kiosk-watchdog.bat`
+in the student's Startup folder to auto-relaunch on crash (stops on a clean
+admin Exit, or when a `stop.kiosk` marker file is present).

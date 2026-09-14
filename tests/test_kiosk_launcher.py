@@ -389,9 +389,16 @@ class TestHotkeyBlocking(unittest.TestCase):
         # Plain Esc is handled by the app itself (admin prompt), not the hook.
         self.assertFalse(k.is_blocked_hotkey(k.VK_ESCAPE, False, False))
 
-    def test_alt_f4_not_blocked_by_hook(self):
-        # Alt+F4 is handled by the launcher's close event, not the hook.
-        self.assertFalse(k.is_blocked_hotkey(0x73, alt_down=True, ctrl_down=False))
+    def test_alt_f4_blocked(self):
+        self.assertTrue(k.is_blocked_hotkey(0x73, alt_down=True, ctrl_down=False))
+
+    def test_ctrl_alt_delete_blocked(self):
+        self.assertTrue(k.is_blocked_hotkey(k.VK_DELETE, alt_down=True, ctrl_down=True))
+
+    def test_delete_without_ctrl_alt_not_blocked(self):
+        self.assertFalse(k.is_blocked_hotkey(k.VK_DELETE, False, False))
+        self.assertFalse(k.is_blocked_hotkey(k.VK_DELETE, True, False))
+        self.assertFalse(k.is_blocked_hotkey(k.VK_DELETE, False, True))
 
 
 class TestAddRemoveApps(unittest.TestCase):

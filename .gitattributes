@@ -1,0 +1,2 @@
+# Ensure batch scripts keep Windows line endings (CRLF) on checkout
+*.bat text eol=crlf

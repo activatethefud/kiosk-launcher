@@ -164,14 +164,27 @@ In `--kiosk` mode, escape attempts ask for the admin password instead:
 
 - **Windows (system-wide):** a low-level keyboard hook swallows the **Win
   key** (all Win+… shortcuts), **Alt+Tab**, **Alt+Esc**, **Ctrl+Esc**,
-  **Ctrl+Shift+Esc** (Task Manager), and **Alt+Space** for as long as the
-  launcher runs. Each attempt pops the admin password prompt.
-- **Everywhere:** **Esc**, **F11**, and **Alt+F4** on the launcher itself
-  prompt for the password rather than exiting.
+  **Ctrl+Shift+Esc** (Task Manager), **Alt+Space**, and **Alt+F4** for as long
+  as the launcher runs. Each attempt pops the admin password prompt.
+- **Everywhere:** **Esc** and **F11** on the launcher itself prompt for the
+  password rather than exiting.
 
 > **Ctrl+Alt+Del cannot be intercepted by any application** — it's the Windows
-> Secure Attention Sequence. Disable Task Manager / the Ctrl+Alt+Del screen
-> via Policy Plus or Group Policy instead (see the registry keys above).
+> Secure Attention Sequence, handled by winlogon before hooks see it. Neuter
+> the CAD screen instead: disable Task Manager, Lock, and Change Password via
+> Policy Plus / Group Policy, or the registry keys in `kiosk-watchdog.bat`.
+
+### Watchdog (auto-relaunch on crash)
+
+`kiosk-watchdog.bat` keeps the launcher alive: if `Kiosk.exe` crashes or is
+killed (non-zero exit), it relaunches after 2 seconds. It stops when you exit
+cleanly via the admin menu (password → Exit, exit code 0) or when a
+`stop.kiosk` marker file exists next to it.
+
+To start it with the student's session, drop a shortcut in the Startup folder
+(`shell:startup`) pointing at the script with `--kiosk` in the target:
+
+    C:\Kiosk\kiosk-watchdog.bat --kiosk
 
 ## Config reference (`kiosk_config.json`)
 
