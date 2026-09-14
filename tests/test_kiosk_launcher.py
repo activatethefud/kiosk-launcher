@@ -367,6 +367,33 @@ class TestBuiltinPresets(unittest.TestCase):
             self.assertNotIn(banned, names)
 
 
+class TestHotkeyBlocking(unittest.TestCase):
+    def test_win_keys_always_blocked(self):
+        self.assertTrue(k.is_blocked_hotkey(k.VK_LWIN, False, False))
+        self.assertTrue(k.is_blocked_hotkey(k.VK_RWIN, False, False))
+
+    def test_alt_tab_and_alt_space_blocked(self):
+        self.assertTrue(k.is_blocked_hotkey(k.VK_TAB, alt_down=True, ctrl_down=False))
+        self.assertTrue(k.is_blocked_hotkey(k.VK_SPACE, alt_down=True, ctrl_down=False))
+
+    def test_plain_tab_and_space_not_blocked(self):
+        self.assertFalse(k.is_blocked_hotkey(k.VK_TAB, False, False))
+        self.assertFalse(k.is_blocked_hotkey(k.VK_SPACE, False, False))
+
+    def test_escape_with_ctrl_or_alt_blocked(self):
+        self.assertTrue(k.is_blocked_hotkey(k.VK_ESCAPE, False, True))   # Ctrl+Esc
+        self.assertTrue(k.is_blocked_hotkey(k.VK_ESCAPE, True, False))   # Alt+Esc
+        self.assertTrue(k.is_blocked_hotkey(k.VK_ESCAPE, True, True))    # Ctrl+Alt+Esc
+
+    def test_plain_escape_not_blocked(self):
+        # Plain Esc is handled by the app itself (admin prompt), not the hook.
+        self.assertFalse(k.is_blocked_hotkey(k.VK_ESCAPE, False, False))
+
+    def test_alt_f4_not_blocked_by_hook(self):
+        # Alt+F4 is handled by the launcher's close event, not the hook.
+        self.assertFalse(k.is_blocked_hotkey(0x73, alt_down=True, ctrl_down=False))
+
+
 class TestAddRemoveApps(unittest.TestCase):
     def test_add_app_appends_normalized(self):
         apps = []

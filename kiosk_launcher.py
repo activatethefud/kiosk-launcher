@@ -689,6 +689,154 @@ def launch(app):
 
 
 # ==========================================================================
+# Escape-hotkey blocking (kiosk mode)
+# ==========================================================================
+# Virtual-key codes (Windows). Plain ints used only for the blocking decision.
+VK_TAB = 0x09
+VK_CONTROL = 0x11
+VK_ESCAPE = 0x1B
+VK_SPACE = 0x20
+VK_LWIN = 0x5B
+VK_RWIN = 0x5C
+
+
+def is_blocked_hotkey(vk, alt_down, ctrl_down):
+    """True if this keydown combo is an escape hotkey that should be blocked.
+
+    Blocks: Win key (all Win+... shortcuts), Alt+Tab, Alt+Esc, Ctrl+Esc,
+    Ctrl+Shift+Esc (Task Manager), and Alt+Space. Alt+F4 is NOT blocked here:
+    the launcher handles it via its close event, and launched apps may
+    legitimately close with Alt+F4.
+    """
+    if vk in (VK_LWIN, VK_RWIN):
+        return True
+    if vk == VK_ESCAPE and (alt_down or ctrl_down):
+        return True
+    if alt_down and vk in (VK_TAB, VK_SPACE):
+        return True
+    return False
+
+
+if os.name == "nt":
+    import ctypes
+    import threading
+    from ctypes import wintypes
+
+    WH_KEYBOARD_LL = 13
+    WM_KEYDOWN = 0x0100
+    WM_SYSKEYDOWN = 0x0104
+    WM_QUIT = 0x0012
+    LLKHF_ALTDOWN = 0x20
+
+    LRESULT = ctypes.c_ssize_t
+    WPARAM_T = ctypes.c_size_t
+
+    class KBDLLHOOKSTRUCT(ctypes.Structure):
+        _fields_ = [
+            ("vkCode", wintypes.DWORD),
+            ("scanCode", wintypes.DWORD),
+            ("flags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.c_size_t),
+        ]
+
+    HOOKPROC = ctypes.WINFUNCTYPE(LRESULT, ctypes.c_int, WPARAM_T, ctypes.c_void_p)
+
+    _user32 = ctypes.windll.user32
+    _user32.SetWindowsHookExW.restype = ctypes.c_void_p
+    _user32.SetWindowsHookExW.argtypes = [
+        ctypes.c_int, HOOKPROC, ctypes.c_void_p, wintypes.DWORD,
+    ]
+    _user32.CallNextHookEx.restype = LRESULT
+    _user32.CallNextHookEx.argtypes = [
+        ctypes.c_void_p, ctypes.c_int, WPARAM_T, ctypes.c_void_p,
+    ]
+    _user32.UnhookWindowsHookEx.restype = ctypes.c_int
+    _user32.UnhookWindowsHookEx.argtypes = [ctypes.c_void_p]
+    _user32.GetMessageW.restype = ctypes.c_int
+    _user32.GetMessageW.argtypes = [
+        ctypes.POINTER(wintypes.MSG), ctypes.c_void_p,
+        wintypes.UINT, wintypes.UINT,
+    ]
+    _user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
+    _user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
+    _user32.PostThreadMessageW.restype = ctypes.c_int
+    _user32.PostThreadMessageW.argtypes = [
+        wintypes.DWORD, wintypes.UINT, WPARAM_T, ctypes.c_void_p,
+    ]
+    _user32.GetAsyncKeyState.restype = ctypes.c_short
+    _user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+
+
+    class KioskHotkeyBlocker:
+        """Low-level keyboard hook that swallows escape hotkeys system-wide.
+
+        On a blocked combo it calls on_blocked() (from the hook thread) and
+        returns 1 so Windows drops the keystroke. Requires a message loop,
+        which is pumped in a dedicated thread.
+        """
+
+        def __init__(self, on_blocked):
+            self.on_blocked = on_blocked
+            self._thread = None
+            self._hook = None
+            self._proc = None
+
+        def start(self):
+            if self._thread is not None:
+                return
+            self._thread = threading.Thread(
+                target=self._run, name="kiosk-hotkey-hook", daemon=True
+            )
+            self._thread.start()
+
+        def _run(self):
+            def proc(nCode, wParam, lParam):
+                if nCode >= 0:
+                    kb = ctypes.cast(
+                        lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)
+                    ).contents
+                    if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                        vk = kb.vkCode
+                        alt = bool(kb.flags & LLKHF_ALTDOWN)
+                        ctrl = False
+                        if vk == VK_ESCAPE:
+                            ctrl = bool(
+                                _user32.GetAsyncKeyState(VK_CONTROL) & 0x8000
+                            )
+                        if is_blocked_hotkey(vk, alt, ctrl):
+                            try:
+                                self.on_blocked()
+                            except Exception:
+                                pass
+                            return 1  # swallow the keystroke
+                return _user32.CallNextHookEx(None, nCode, wParam, lParam)
+
+            self._proc = HOOKPROC(proc)
+            self._hook = _user32.SetWindowsHookExW(
+                WH_KEYBOARD_LL, self._proc, None, 0
+            )
+            if not self._hook:
+                return
+            msg = wintypes.MSG()
+            while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                _user32.TranslateMessage(ctypes.byref(msg))
+                _user32.DispatchMessageW(ctypes.byref(msg))
+            _user32.UnhookWindowsHookEx(self._hook)
+            self._hook = None
+
+        def stop(self):
+            if self._thread is not None:
+                try:
+                    _user32.PostThreadMessageW(
+                        self._thread.ident, WM_QUIT, 0, None
+                    )
+                    self._thread.join(timeout=2)
+                finally:
+                    self._thread = None
+
+
+# ==========================================================================
 # CLI modes (no GUI needed)
 # ==========================================================================
 def cmd_scan(args):
@@ -728,7 +876,7 @@ def cmd_set_password(args):
 # ==========================================================================
 def run_gui(args):
     try:
-        from PySide6.QtCore import Qt, QPoint, QTimer, QFileSystemWatcher
+        from PySide6.QtCore import Qt, QPoint, QTimer, QFileSystemWatcher, QObject, Signal
         from PySide6.QtWidgets import (
             QApplication,
             QDialog,
@@ -963,23 +1111,29 @@ def run_gui(args):
                 self.status_label.setText(f"Launched {app['name']}")
 
         def on_admin(self):
-            pw, ok = QInputDialog.getText(
-                self, "Admin access", "Password:", QLineEdit.Password
-            )
-            if not ok:
+            if getattr(self, "_admin_prompt_open", False):
                 return
-            if not verify_password(pw, self.cfg["password"]):
-                QMessageBox.warning(self, "Denied", "Wrong password.")
-                return
-            menu = QMenu(self)
-            menu.addAction("\U0001F4DD  Add app\u2026", self.add_app)
-            menu.addAction("\u2796  Remove app\u2026", self.remove_app)
-            menu.addAction("\U0001F511  Change password\u2026", self.change_password)
-            menu.addAction("\U0001F504  Rescan", self.rebuild)
-            menu.addAction("\U0001F6AA  Exit", self.quit_now)
-            menu.exec(
-                self.admin_btn.mapToGlobal(QPoint(0, self.admin_btn.height()))
-            )
+            self._admin_prompt_open = True
+            try:
+                pw, ok = QInputDialog.getText(
+                    self, "Admin access", "Password:", QLineEdit.Password
+                )
+                if not ok:
+                    return
+                if not verify_password(pw, self.cfg["password"]):
+                    QMessageBox.warning(self, "Denied", "Wrong password.")
+                    return
+                menu = QMenu(self)
+                menu.addAction("\U0001F4DD  Add app\u2026", self.add_app)
+                menu.addAction("\u2796  Remove app\u2026", self.remove_app)
+                menu.addAction("\U0001F511  Change password\u2026", self.change_password)
+                menu.addAction("\U0001F504  Rescan", self.rebuild)
+                menu.addAction("\U0001F6AA  Exit", self.quit_now)
+                menu.exec(
+                    self.admin_btn.mapToGlobal(QPoint(0, self.admin_btn.height()))
+                )
+            finally:
+                self._admin_prompt_open = False
 
         def add_app(self):
             dlg = AddAppDialog(self)
@@ -1027,24 +1181,45 @@ def run_gui(args):
 
         def closeEvent(self, event):
             if self.kiosk:
-                pw, ok = QInputDialog.getText(
-                    self, "Exit", "Exit requires the admin password:", QLineEdit.Password
-                )
-                if ok and verify_password(pw, self.cfg["password"]):
-                    event.accept()
-                else:
+                if getattr(self, "_admin_prompt_open", False):
                     event.ignore()
+                    return
+                self._admin_prompt_open = True
+                try:
+                    pw, ok = QInputDialog.getText(
+                        self, "Exit", "Exit requires the admin password:",
+                        QLineEdit.Password,
+                    )
+                    if ok and verify_password(pw, self.cfg["password"]):
+                        event.accept()
+                    else:
+                        event.ignore()
+                finally:
+                    self._admin_prompt_open = False
             else:
                 event.accept()
 
         def keyPressEvent(self, event):
-            if self.kiosk and event.key() == Qt.Key_Escape:
+            if self.kiosk and event.key() in (Qt.Key_Escape, Qt.Key_F11):
                 self.on_admin()
-            else:
-                super().keyPressEvent(event)
+                return
+            super().keyPressEvent(event)
 
     app = QApplication(sys.argv)
     win = MainWindow()
+    if os.name == "nt" and win.kiosk:
+        class HotkeyBridge(QObject):
+            hotkeyBlocked = Signal()
+
+            def notify(self):
+                self.hotkeyBlocked.emit()
+
+        bridge = HotkeyBridge()
+        bridge.hotkeyBlocked.connect(win.on_admin)
+        blocker = KioskHotkeyBlocker(bridge.notify)
+        blocker.start()
+        win._kiosk_hotkey_blocker = blocker
+        app.aboutToQuit.connect(blocker.stop)
     if getattr(args, "smoke", False):
         QTimer.singleShot(600, app.quit)
     if win.kiosk:

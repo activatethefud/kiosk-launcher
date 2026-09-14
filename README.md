@@ -22,7 +22,9 @@ more apps by regex.
 - **Admin area (password-protected):**
   - Add an app by name + one-or-more regexes (matched against the exe path)
   - Remove apps, change the password, rescan
-- **Kiosk mode:** frameless fullscreen; exiting requires the admin password
+- **Kiosk mode:** frameless fullscreen; exiting requires the admin password.
+  Escape hotkeys (Win key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc,
+  Alt+Space) are intercepted on Windows and route to the admin password prompt.
 - **One config file** (`kiosk_config.json`) — auto-generated on first run
   (gitignored), so each machine can build its own.
 - **App list is a plain data file** (`apps.json`) — extend it with an LLM and
@@ -155,6 +157,21 @@ launcher in its Startup folder, and lock policies down with
 
 > **Always test in a VM or on a spare machine first**, and keep an admin
 > account with a normal desktop.
+
+### Hotkey lockdown (kiosk mode)
+
+In `--kiosk` mode, escape attempts ask for the admin password instead:
+
+- **Windows (system-wide):** a low-level keyboard hook swallows the **Win
+  key** (all Win+… shortcuts), **Alt+Tab**, **Alt+Esc**, **Ctrl+Esc**,
+  **Ctrl+Shift+Esc** (Task Manager), and **Alt+Space** for as long as the
+  launcher runs. Each attempt pops the admin password prompt.
+- **Everywhere:** **Esc**, **F11**, and **Alt+F4** on the launcher itself
+  prompt for the password rather than exiting.
+
+> **Ctrl+Alt+Del cannot be intercepted by any application** — it's the Windows
+> Secure Attention Sequence. Disable Task Manager / the Ctrl+Alt+Del screen
+> via Policy Plus or Group Policy instead (see the registry keys above).
 
 ## Config reference (`kiosk_config.json`)
 

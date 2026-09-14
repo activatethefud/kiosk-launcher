@@ -78,6 +78,13 @@ Top-level functions (module `kiosk_launcher`):
 - `launch(app)` — `subprocess.Popen`, non-blocking; returns `None` or an error
   string. Windows Store aliases (paths containing `WindowsApps`) are launched
   via `cmd /c start`.
+- `is_blocked_hotkey(vk, alt_down, ctrl_down)` / `KioskHotkeyBlocker` (Windows
+  only) — kiosk escape-hotkey blocking. `is_blocked_hotkey` is a pure,
+  cross-platform decision function (unit-tested). `KioskHotkeyBlocker` installs
+  a `WH_KEYBOARD_LL` ctypes hook on a background thread that swallows the Win
+  key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc and Alt+Space, and calls a
+  callback (which emits a Qt signal → password prompt) for each blocked combo.
+  Ctrl+Alt+Del cannot be hooked and must be disabled via policy.
 - `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
   password prompts, and close/keyboard handling. Admin add/remove app edits
   the in-memory app list and calls `save_apps`. A `QFileSystemWatcher` +
