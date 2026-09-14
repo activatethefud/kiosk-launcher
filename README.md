@@ -48,8 +48,9 @@ kiosk_config.json           # runtime-generated settings + password, not committ
 pip install --user --break-system-packages pyside6-essentials
 # or: sudo apt install python3-pyside6
 
-python3 kiosk_launcher.py                # windowed (development)
-python3 kiosk_launcher.py --kiosk        # frameless fullscreen (locked)
+python3 kiosk_launcher.py                # fullscreen (kiosk mode)
+python3 kiosk_launcher.py --windowed     # windowed (development)
+python3 kiosk_launcher.py --kiosk        # force frameless fullscreen
 python3 kiosk_launcher.py --scan         # show what was found, no GUI
 python3 kiosk_launcher.py --set-password # change admin password
 python3 kiosk_launcher.py --config X.json
@@ -196,7 +197,7 @@ Settings + password only (the app list is in `apps.json`):
 ```jsonc
 {
   "password": { "salt": "...", "hash": "...", "iterations": 200000 },
-  "fullscreen": false,          // true = start in kiosk mode
+  "fullscreen": true,           // start fullscreen (kiosk); false = windowed
   "columns": 4                  // buttons per row
 }
 ```

@@ -24,8 +24,9 @@ kiosk_config.json      # runtime-generated settings + password, GITIGNORED
 ## Commands
 
 ```bash
-python3 kiosk_launcher.py                    # run windowed (dev)
-python3 kiosk_launcher.py --kiosk            # frameless fullscreen (locked)
+python3 kiosk_launcher.py                    # run fullscreen (default)
+python3 kiosk_launcher.py --windowed         # windowed (dev)
+python3 kiosk_launcher.py --kiosk            # force frameless fullscreen
 python3 kiosk_launcher.py --scan             # print discovery results, no GUI
 python3 kiosk_launcher.py --set-password     # change admin password (interactive)
 python3 kiosk_launcher.py --config PATH      # use a specific config file

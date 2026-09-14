@@ -60,6 +60,7 @@ class TestConfig(unittest.TestCase):
         self.assertIn("hash", cfg["password"])
         self.assertIn("iterations", cfg["password"])
         self.assertIn("fullscreen", cfg)
+        self.assertTrue(cfg["fullscreen"])
         self.assertIn("columns", cfg)
         self.assertNotIn("apps", cfg)  # apps are no longer in the config
 
@@ -84,6 +85,12 @@ class TestConfig(unittest.TestCase):
         cfg, _ = k.load_config(self.path)
         self.assertTrue(cfg["fullscreen"])
         self.assertEqual(cfg["columns"], 3)
+
+    def test_load_defaults_fullscreen_true(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump({"columns": 3}, f)
+        cfg, _ = k.load_config(self.path)
+        self.assertTrue(cfg["fullscreen"])
 
     def test_save_load_roundtrip(self):
         cfg, _ = k.load_config(self.path)

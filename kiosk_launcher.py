@@ -20,8 +20,9 @@ Features
 
 Usage
 -----
-    python3 kiosk_launcher.py                 # run the launcher (windowed)
-    python3 kiosk_launcher.py --kiosk         # frameless fullscreen (locked)
+    python3 kiosk_launcher.py                 # run the launcher (fullscreen)
+    python3 kiosk_launcher.py --windowed      # run windowed (development)
+    python3 kiosk_launcher.py --kiosk         # force frameless fullscreen
     python3 kiosk_launcher.py --scan          # print what was found, then exit
     python3 kiosk_launcher.py --set-password  # change the admin password
     python3 kiosk_launcher.py --config PATH   # use a different config file
@@ -325,7 +326,7 @@ def seed_config():
     salt, digest, iterations = hash_password(DEFAULT_PASSWORD)
     return {
         "password": {"salt": salt, "hash": digest, "iterations": iterations},
-        "fullscreen": False,
+        "fullscreen": True,
         "columns": 4,
     }
 
@@ -344,7 +345,7 @@ def load_config(path):
         cfg = seed_config()
         created = True
 
-    cfg.setdefault("fullscreen", False)
+    cfg.setdefault("fullscreen", True)
     cfg.setdefault("columns", 4)
     if "password" not in cfg or "salt" not in cfg.get("password", {}):
         cfg["password"] = seed_config()["password"]
@@ -1027,6 +1028,7 @@ def run_gui(args):
             self.grid_host = QWidget()
             self.grid = QGridLayout(self.grid_host)
             self.grid.setSpacing(14)
+            self.grid.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
             scroll.setWidget(self.grid_host)
 
             self.admin_btn = QPushButton("\u2699  Admin")
@@ -1059,7 +1061,8 @@ def run_gui(args):
 
             if self.kiosk:
                 self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
-            self.resize(1000, 700)
+            else:
+                self.resize(1000, 700)
             self.rebuild()
 
             # Live-reload apps.json whenever it changes on disk.
@@ -1103,7 +1106,7 @@ def run_gui(args):
                 icon = EMOJI.get(key, DEFAULT_EMOJI)
                 btn = QPushButton(f"{icon}\n{a['name']}")
                 btn.setProperty("class", "app")
-                btn.setMinimumSize(150, 110)
+                btn.setFixedSize(180, 130)
                 btn.setToolTip(a["path"])
                 btn.clicked.connect(lambda _=False, a=a: self.launch(a))
                 self.grid.addWidget(btn, i // cols, i % cols)
@@ -1192,7 +1195,10 @@ def run_gui(args):
             QApplication.instance().quit()
 
         def closeEvent(self, event):
-            if self.kiosk:
+            # Only user-initiated closes (Alt+F4 / window X) need the password.
+            # Programmatic quits (admin Exit, app.quit()) arrive non-spontaneously
+            # and must not re-prompt or block shutdown.
+            if self.kiosk and event.spontaneous():
                 if getattr(self, "_admin_prompt_open", False):
                     event.ignore()
                     return
