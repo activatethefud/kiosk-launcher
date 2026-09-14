@@ -17,8 +17,18 @@ more apps by regex.
   - Add an app by name + one-or-more regexes (matched against the exe path)
   - Remove apps, change the password, rescan
 - **Kiosk mode:** frameless fullscreen; exiting requires the admin password
-- **One config file** (`kiosk_config.json`) — copy it to every machine or
-  let each machine build its own on first run.
+- **One config file** (`kiosk_config.json`) — auto-generated on first run
+  (gitignored), so each machine can build its own.
+
+## Project layout
+
+```
+kiosk_launcher.py           # the entire application (single file)
+tests/test_kiosk_launcher.py
+AGENT.md                    # guidance for AI coding agents
+README.md
+kiosk_config.json           # runtime-generated, not committed
+```
 
 ## Quick start
 
@@ -53,6 +63,23 @@ python3 kiosk_launcher.py --config X.json
 
 The added entry is saved to `kiosk_config.json` and the launcher rescans
 immediately.
+
+## Development
+
+```bash
+# run the test suite (stdlib unittest; also works with pytest)
+python3 -m unittest discover -s tests -v
+
+# syntax check
+python3 -m py_compile kiosk_launcher.py
+
+# headless GUI smoke test
+QT_QPA_PLATFORM=offscreen python3 kiosk_launcher.py --smoke
+```
+
+There are no runtime dependencies beyond PySide6, and the core (discovery,
+config, password) is stdlib-only so `--scan`/`--set-password` work without
+it. See [AGENT.md](AGENT.md) for architecture details and coding conventions.
 
 ## Deploy on Windows (as a custom shell)
 
