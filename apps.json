@@ -128,5 +128,12 @@
       "(?:^|[\\\\/])mupdf(?:-gl)?(?:\\.exe)?$"
     ],
     "args": []
+  },
+  {
+    "name": "VirtualBox",
+    "patterns": [
+      "virtualbox(?:\\.exe)?$"
+    ],
+    "args": []
   }
 ]

@@ -146,6 +146,12 @@ BUILTIN_APPS = [
         "patterns": [r"(?:^|[\\/])mupdf(?:-gl)?(?:\.exe)?$"],
         "args": [],
     },
+    # Virtualization
+    {
+        "name": "VirtualBox",
+        "patterns": [r"virtualbox(?:\.exe)?$"],
+        "args": [],
+    },
 ]
 
 # Friendly icons shown on the buttons (cosmetic only).
@@ -168,6 +174,7 @@ EMOJI = {
     "sumatrapdf": "\U0001F4D5",
     "okular": "\U0001F4D6",
     "mupdf": "\U0001F4D1",
+    "virtualbox": "\U0001F4E6",
 }
 DEFAULT_EMOJI = "\U0001F680"
 

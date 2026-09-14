@@ -297,6 +297,25 @@ class TestBuiltinPresets(unittest.TestCase):
         self.assertEqual(found, [])
         self.assertEqual(missing, ["MuPDF"])
 
+    def test_virtualbox_matches_gui_not_cli(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "VirtualBox"]
+        candidates = {
+            r"C:\Program Files\Oracle\VirtualBox\VirtualBox.exe",
+            "/usr/bin/virtualbox",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+
+    def test_virtualbox_ignores_vboxmanage(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "VirtualBox"]
+        candidates = {r"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["VirtualBox"])
+
 
 class TestAddRemoveApps(unittest.TestCase):
     def test_add_app_appends_normalized(self):
