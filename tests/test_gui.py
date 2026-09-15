@@ -107,11 +107,15 @@ def _trigger_menu(substring):
 
 
 class GuiTestBase(unittest.TestCase):
-    def make_window(self, kiosk=False, apps=None, password="secret"):
+    def make_window(self, kiosk=False, apps=None, password="secret", card_size=None, columns=None):
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp, True)
         cfg = k.seed_config()
         k.set_password(cfg, password)
+        if card_size is not None:
+            cfg["card_size"] = card_size
+        if columns is not None:
+            cfg["columns"] = columns
         cfg_path = os.path.join(tmp, "config.json")
         apps_path = os.path.join(tmp, "apps.json")
         if apps is None:
@@ -362,7 +366,7 @@ class TestLayoutAndOverflow(GuiTestBase):
             for a in apps
         ]
         with mock.patch.object(k, "discover_apps", return_value=(found, [])):
-            win, *_ = self.make_window(kiosk=False)
+            win, *_ = self.make_window(kiosk=False, card_size="medium")
         QTest.qWait(300)
 
         # Window stays at its configured size — it does not grow to fit 40 apps.
@@ -375,6 +379,14 @@ class TestLayoutAndOverflow(GuiTestBase):
         # Buttons keep their fixed size — they are never stretched.
         for b in self._app_buttons(win)[:5]:
             self.assertEqual((b.width(), b.height()), (180, 130))
+
+    def test_card_size_preset_changes_button_size(self):
+        found = [{"name": "Alpha", "path": "/x/alpha", "args": []}]
+        with mock.patch.object(k, "discover_apps", return_value=(found, [])):
+            win, *_ = self.make_window(card_size="small")
+        btn = win.findChild(QPushButton, "app:Alpha")
+        self.assertIsNotNone(btn)
+        self.assertEqual((btn.width(), btn.height()), (150, 110))
 
 
 if __name__ == "__main__":

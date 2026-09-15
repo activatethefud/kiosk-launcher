@@ -221,9 +221,21 @@ Settings + password only (the app list is in `apps.json`):
 {
   "password": { "salt": "...", "hash": "...", "iterations": 200000 },
   "fullscreen": true,           // start fullscreen (kiosk); false = windowed
-  "columns": 4                  // buttons per row
+  "columns": 0,                 // 0 = auto-fit; >0 = fixed number of columns
+  "card_size": "auto"           // auto | small | medium | large
 }
 ```
+
+Card grid presets (built in, but the config above can pin one):
+
+| preset | card | font | typical screen |
+|---|---|---|---|
+| `small` | 150×110 | 16px | < 1280 wide |
+| `medium` | 180×130 | 20px | 1280–1919 |
+| `large` | 220×160 | 24px | ≥ 1920 |
+
+`"card_size": "auto"` picks the preset by screen width; `"columns": 0`
+auto-fits the number of columns to the window width (both adapt live on resize).
 
 App templates (`apps.json`):
 

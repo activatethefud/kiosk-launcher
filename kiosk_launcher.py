@@ -446,6 +446,34 @@ def default_apps_path():
     return os.path.join(_base_dir(), "apps.json")
 
 
+# Card/layout presets: named size tiers plus a pure column-count helper.
+CARD_PRESETS = {
+    "small": {"width": 150, "height": 110, "font_px": 16},
+    "medium": {"width": 180, "height": 130, "font_px": 20},
+    "large": {"width": 220, "height": 160, "font_px": 24},
+}
+DEFAULT_CARD_SIZE = "auto"
+GRID_SPACING = 14
+GRID_MARGIN = 36
+
+
+def resolve_card_preset(size_key, screen_width):
+    """Return the card size preset for size_key ("auto"/"small"/"medium"/"large")."""
+    if size_key in CARD_PRESETS:
+        return CARD_PRESETS[size_key]
+    if screen_width < 1280:
+        return CARD_PRESETS["small"]
+    if screen_width < 1920:
+        return CARD_PRESETS["medium"]
+    return CARD_PRESETS["large"]
+
+
+def auto_columns(viewport_width, card_width, spacing=GRID_SPACING, margin=GRID_MARGIN):
+    """How many card columns fit in viewport_width (always at least 1)."""
+    usable = max(0, int(viewport_width) - margin)
+    return max(1, (usable + spacing) // (card_width + spacing))
+
+
 def error_log_path():
     return os.path.join(_base_dir(), "kiosk-error.log")
 
@@ -488,7 +516,8 @@ def seed_config():
     return {
         "password": {"salt": salt, "hash": digest, "iterations": iterations},
         "fullscreen": True,
-        "columns": 4,
+        "columns": 0,          # 0 = auto-fit columns; >0 = fixed
+        "card_size": "auto",   # auto | small | medium | large
     }
 
 
@@ -507,7 +536,8 @@ def load_config(path):
         created = True
 
     cfg.setdefault("fullscreen", True)
-    cfg.setdefault("columns", 4)
+    cfg.setdefault("columns", 0)
+    cfg.setdefault("card_size", "auto")
     if "password" not in cfg or "salt" not in cfg.get("password", {}):
         cfg["password"] = seed_config()["password"]
         created = True
@@ -1236,14 +1266,14 @@ if _HAS_QT:
             self.status_label.setObjectName("status_label")
             self.status_label.setStyleSheet("color: #a6adc8; font-size: 14px;")
 
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+            self.scroll = QScrollArea()
+            self.scroll.setWidgetResizable(True)
+            self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
             self.grid_host = QWidget()
             self.grid = QGridLayout(self.grid_host)
             self.grid.setSpacing(14)
             self.grid.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-            scroll.setWidget(self.grid_host)
+            self.scroll.setWidget(self.grid_host)
 
             self.admin_btn = QPushButton("\u2699  Admin")
             self.admin_btn.setObjectName("admin_btn")
@@ -1258,7 +1288,7 @@ if _HAS_QT:
             bar.addWidget(self.status_label, 1)
             bar.addWidget(self.admin_btn)
 
-            root.addWidget(scroll, 1)
+            root.addWidget(self.scroll, 1)
             root.addLayout(bar)
 
             self.setStyleSheet(
@@ -1266,13 +1296,26 @@ if _HAS_QT:
                 QWidget { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', 'DejaVu Sans', sans-serif; }
                 QPushButton.app {
                     background: #313244; color: #cdd6f4; border-radius: 14px;
-                    font-size: 20px; font-weight: 600; padding: 18px;
+                    padding: 18px;
                 }
                 QPushButton.app:hover { background: #45475a; }
                 QPushButton.app:pressed { background: #585b70; }
                 QLabel { background: transparent; }
                 """
             )
+
+            scr = self.screen()
+            screen_w = scr.geometry().width() if scr else 1280
+            self.card_preset = resolve_card_preset(
+                self.cfg.get("card_size", DEFAULT_CARD_SIZE), screen_w
+            )
+            self._found = []
+            self._missing = []
+            self._last_cols = None
+            self._relayout_timer = QTimer(self)
+            self._relayout_timer.setSingleShot(True)
+            self._relayout_timer.setInterval(150)
+            self._relayout_timer.timeout.connect(self._relayout_on_resize)
 
             if self.kiosk:
                 self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
@@ -1309,34 +1352,61 @@ if _HAS_QT:
             )
 
         def rebuild(self):
+            found, missing = discover_apps(self.apps)
+            self._found = found
+            self._missing = missing
+            self._relayout()
+
+        def _compute_columns(self):
+            fixed = int(self.cfg.get("columns", 0) or 0)
+            if fixed > 0:
+                return fixed
+            vw = self.scroll.viewport().width()
+            if vw < 100:
+                vw = self.width()
+            return auto_columns(vw, self.card_preset["width"])
+
+        def _relayout(self):
             while self.grid.count():
                 item = self.grid.takeAt(0)
                 w = item.widget()
                 if w:
                     w.deleteLater()
-            found, missing = discover_apps(self.apps)
-            cols = max(1, int(self.cfg.get("columns", 4)))
+            preset = self.card_preset
+            cols = self._compute_columns()
+            self._last_cols = cols
             card_font = QFont()
-            card_font.setPixelSize(20)
+            card_font.setPixelSize(preset["font_px"])
             card_font.setWeight(QFont.Weight.DemiBold)
-            for i, a in enumerate(found):
+            max_wrap = max(40, preset["width"] - 50)
+            for i, a in enumerate(self._found):
                 key = a["name"].lower()
                 icon = EMOJI.get(key, DEFAULT_EMOJI)
                 btn = QPushButton()
                 btn.setProperty("class", "app")
                 btn.setObjectName("app:" + a["name"])
-                btn.setFixedSize(180, 130)
+                btn.setFixedSize(preset["width"], preset["height"])
+                btn.setFont(card_font)
                 btn.setToolTip(a["path"])
-                btn.setText(f"{icon}\n{wrap_text(a['name'], card_font, 130)}")
+                btn.setText(f"{icon}\n{wrap_text(a['name'], card_font, max_wrap)}")
                 btn.clicked.connect(lambda _=False, a=a: self.launch(a))
                 self.grid.addWidget(btn, i // cols, i % cols)
-            self.grid.setRowStretch((len(found) // cols) + 1, 1)
-            if missing:
+            self.grid.setRowStretch((len(self._found) // cols) + 1, 1)
+            if self._missing:
                 self.status_label.setText(
-                    f"\u2714 {len(found)} available   \u2716 missing: {', '.join(missing)}"
+                    f"\u2714 {len(self._found)} available   \u2716 missing: {', '.join(self._missing)}"
                 )
             else:
-                self.status_label.setText(f"\u2714 {len(found)} available")
+                self.status_label.setText(f"\u2714 {len(self._found)} available")
+
+        def _relayout_on_resize(self):
+            if self._compute_columns() != self._last_cols:
+                self._relayout()
+
+        def resizeEvent(self, event):
+            super().resizeEvent(event)
+            if hasattr(self, "_relayout_timer"):
+                self._relayout_timer.start()
 
         def launch(self, app):
             err = launch(app)

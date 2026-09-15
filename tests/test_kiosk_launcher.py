@@ -62,6 +62,8 @@ class TestConfig(unittest.TestCase):
         self.assertIn("fullscreen", cfg)
         self.assertTrue(cfg["fullscreen"])
         self.assertIn("columns", cfg)
+        self.assertEqual(cfg["columns"], 0)
+        self.assertEqual(cfg["card_size"], "auto")
         self.assertNotIn("apps", cfg)  # apps are no longer in the config
 
     def test_load_creates_file(self):
@@ -558,6 +560,27 @@ class TestErrorReportingAndBundling(unittest.TestCase):
                 apps, _ = k.load_apps(target)
             self.assertEqual([a["name"] for a in apps], ["Bundled"])
             self.assertTrue(os.path.exists(target))  # copied next to the exe
+
+
+class TestLayoutPresets(unittest.TestCase):
+    def test_auto_preset_picks_by_screen_width(self):
+        self.assertEqual(k.resolve_card_preset("auto", 1024), k.CARD_PRESETS["small"])
+        self.assertEqual(k.resolve_card_preset("auto", 1280), k.CARD_PRESETS["medium"])
+        self.assertEqual(k.resolve_card_preset("auto", 1920), k.CARD_PRESETS["large"])
+
+    def test_explicit_preset_wins(self):
+        self.assertEqual(k.resolve_card_preset("small", 3000), k.CARD_PRESETS["small"])
+        self.assertEqual(k.resolve_card_preset("large", 640), k.CARD_PRESETS["large"])
+
+    def test_unknown_key_behaves_like_auto(self):
+        self.assertEqual(k.resolve_card_preset("bogus", 1024), k.CARD_PRESETS["small"])
+
+    def test_auto_columns(self):
+        self.assertEqual(k.auto_columns(950, 180), 4)
+        self.assertEqual(k.auto_columns(1000, 180), 5)
+        self.assertEqual(k.auto_columns(400, 180), 1)
+        self.assertEqual(k.auto_columns(1920, 220), 8)
+        self.assertEqual(k.auto_columns(0, 180), 1)
 
 
 class TestWalkDepth(unittest.TestCase):
