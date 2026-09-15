@@ -259,7 +259,8 @@ can switch keyboard layouts; everything else listed above is blocked.
 
 Notes:
 
-- It expects `Kiosk.exe` **next to the script** (`%~dp0Kiosk.exe`).
+- It looks for `Kiosk.exe` in **`C:\Kiosk`** (falls back to the script's own
+  folder if not found there).
 - It's for **Mode A**: drop a shortcut in `shell:startup` pointing at
   `C:\Kiosk\kiosk-watchdog.bat --kiosk`.
 - It **can't be the shell itself** — the registry `Shell` value must be an

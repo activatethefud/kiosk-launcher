@@ -5,7 +5,7 @@ rem
 rem  Relaunches the launcher if it crashes or is killed, and stops when:
 rem    * the launcher exits cleanly (exit code 0 = admin entered the password
 rem      and chose Exit from the menu), or
-rem    * a file named "stop.kiosk" exists next to this script.
+rem    * a file named "stop.kiosk" exists in C:\Kiosk.
 rem
 rem  Usage:
 rem    kiosk-watchdog.bat           (uses the fullscreen setting in config)
@@ -17,8 +17,12 @@ rem  lines below and running this script once as the student user.
 rem ===========================================================================
 setlocal EnableExtensions
 
-set "APP=%~dp0Kiosk.exe"
-set "STOPFILE=%~dp0stop.kiosk"
+set "KIOSK_DIR=C:\Kiosk"
+set "APP=%KIOSK_DIR%\Kiosk.exe"
+set "STOPFILE=%KIOSK_DIR%\stop.kiosk"
+
+rem Fall back to this script's own folder if Kiosk.exe isn't in C:\Kiosk yet.
+if not exist "%APP%" set "APP=%~dp0Kiosk.exe"
 
 rem --- Optional hardening (remove "rem" to apply) ---
 rem reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableTaskMgr /t REG_DWORD /d 1 /f
