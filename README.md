@@ -177,14 +177,27 @@ Then choose one mode:
 
 The repo includes `kiosk-shell.bat` to do this safely.
 
-Enable (run **as the Student user**):
+Enable — either run it **as the Student user**:
 
 ```bat
 C:\Kiosk\kiosk-shell.bat enable
 ```
 
+or, as an Administrator, target the student directly (student can stay logged off):
+
+```bat
+C:\Kiosk\kiosk-shell.bat enable Student
+```
+
 This sets the student's shell to `C:\Kiosk\Kiosk.exe` and disables Task
 Manager, Lock, and Change Password for that user. Log off and back on.
+
+Check what's currently set (to diagnose "works on one PC, not another"):
+
+```bat
+C:\Kiosk\kiosk-shell.bat check           (as the student)
+C:\Kiosk\kiosk-shell.bat check Student   (as admin)
+```
 
 > Do **not** set the HKLM `Shell` value or you can lock yourself out. Keep the
 > Admin account on the normal explorer shell.

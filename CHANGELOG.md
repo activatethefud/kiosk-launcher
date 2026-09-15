@@ -2,6 +2,12 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.4.0] - 2026-09-15
+
+- `kiosk-shell.bat`: added `check` subcommand and offline `enable <Username>`,
+  plus self-verification after writing — to diagnose the "works on one PC,
+  not another" shell-replacement issue.
+
 ## [0.3.0] - 2026-09-15
 
 - **Diagnostics:** `--diagnose` in-app report + `diagnose-windows.ps1` machine-level report
