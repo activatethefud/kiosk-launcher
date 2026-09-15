@@ -44,6 +44,11 @@ class TestPassword(unittest.TestCase):
         salt, _, _ = k.hash_password("pw")
         int(salt, 16)  # raises if not hex
 
+    def test_verify_password_handles_corrupt_config(self):
+        self.assertFalse(k.verify_password("x", {}))
+        self.assertFalse(k.verify_password("x", {"salt": "nothex", "hash": "h"}))
+        self.assertFalse(k.verify_password(None, {"salt": "00", "hash": "00"}))
+
 
 # ---------------------------------------------------------------------------
 # Config (settings + password only; apps now live in apps.json)
@@ -87,6 +92,28 @@ class TestConfig(unittest.TestCase):
         cfg, _ = k.load_config(self.path)
         self.assertTrue(cfg["fullscreen"])
         self.assertEqual(cfg["columns"], 3)
+
+    def test_load_config_repairs_non_dict_json(self):
+        for bad in ("[]", '"hello"', "123"):
+            with open(self.path, "w", encoding="utf-8") as f:
+                f.write(bad)
+            cfg, _ = k.load_config(self.path)
+            self.assertIsInstance(cfg, dict)
+            self.assertIn("salt", cfg["password"])
+
+    def test_load_config_repairs_broken_password(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump({"password": "not-a-dict", "columns": 3}, f)
+        cfg, _ = k.load_config(self.path)
+        self.assertIsInstance(cfg["password"], dict)
+        self.assertIn("salt", cfg["password"])
+        self.assertIn("hash", cfg["password"])
+
+    def test_load_config_repairs_password_missing_hash(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump({"password": {"salt": "abcdef0123456789"}}, f)
+        cfg, _ = k.load_config(self.path)
+        self.assertIn("hash", cfg["password"])
 
     def test_load_defaults_fullscreen_true(self):
         with open(self.path, "w", encoding="utf-8") as f:
@@ -244,6 +271,26 @@ class TestDiscovery(unittest.TestCase):
                 found, missing = k.discover_apps(apps)
         self.assertEqual(found, [])
         self.assertEqual(missing, ["Bad"])
+
+    def test_discover_apps_skips_malformed_entries(self):
+        apps = [
+            {"name": "Good", "patterns": ["good$"], "args": []},
+            "not-a-dict",
+            {"name": "NoPatterns", "args": []},
+            {"name": "BadRegex", "patterns": ["(unclosed"], "args": []},
+        ]
+        with mock.patch.object(k, "gather_candidates", return_value={"/x/good"}):
+            with mock.patch("sys.stderr"):
+                found, missing = k.discover_apps(apps)
+        self.assertEqual([a["name"] for a in found], ["Good"])
+        self.assertEqual(sorted(missing), ["?", "BadRegex", "NoPatterns"])
+
+    def test_discover_apps_coerces_string_args(self):
+        apps = [{"name": "A", "patterns": ["a$"], "args": "--flag --two"}]
+        with mock.patch.object(k, "gather_candidates", return_value={"/x/a"}):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found[0]["args"], ["--flag", "--two"])
+        self.assertEqual(missing, [])
 
     def test_gather_candidates_includes_path_entries(self):
         with tempfile.TemporaryDirectory() as tmp:

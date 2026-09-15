@@ -522,13 +522,20 @@ def seed_config():
 
 
 def load_config(path):
-    """Load config, creating/repairing it if needed. Returns (cfg, path)."""
+    """Load config, creating/repairing it if needed. Returns (cfg, path).
+
+    Malformed content (wrong JSON type, missing/broken password) is repaired
+    instead of crashing.
+    """
     created = False
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
         except (json.JSONDecodeError, OSError):
+            cfg = seed_config()
+            created = True
+        if not isinstance(cfg, dict):
             cfg = seed_config()
             created = True
     else:
@@ -538,7 +545,8 @@ def load_config(path):
     cfg.setdefault("fullscreen", True)
     cfg.setdefault("columns", 0)
     cfg.setdefault("card_size", "auto")
-    if "password" not in cfg or "salt" not in cfg.get("password", {}):
+    pw = cfg.get("password")
+    if not isinstance(pw, dict) or "salt" not in pw or "hash" not in pw:
         cfg["password"] = seed_config()["password"]
         created = True
 
@@ -671,12 +679,16 @@ def hash_password(password, salt=None, iterations=200_000):
 
 
 def verify_password(password, pw_cfg):
-    salt = pw_cfg["salt"]
-    digest = pw_cfg["hash"]
-    iterations = pw_cfg.get("iterations", 200_000)
-    candidate = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), bytes.fromhex(salt), iterations
-    )
+    """Return True if password matches pw_cfg. Corrupt configs → False."""
+    try:
+        salt = pw_cfg["salt"]
+        digest = pw_cfg["hash"]
+        iterations = pw_cfg.get("iterations", 200_000)
+        candidate = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), bytes.fromhex(salt), iterations
+        )
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
     return secrets.compare_digest(candidate.hex(), digest)
 
 
@@ -866,16 +878,31 @@ def gather_candidates():
 
 
 def discover_apps(apps):
-    """Return (found, missing) for the given app templates."""
+    """Return (found, missing) for the given app templates.
+
+    Malformed entries (not a dict, missing name/patterns) are reported as
+    missing rather than crashing.
+    """
     candidates = sorted(gather_candidates(), key=str.lower)
     found, missing = [], []
     for app in apps:
+        if not isinstance(app, dict):
+            missing.append("?")
+            continue
+        name = app.get("name", "?")
+        patterns = app.get("patterns", [])
+        if not isinstance(patterns, list) or not patterns:
+            missing.append(str(name))
+            continue
         try:
             # Case-insensitive: a candidate "GIMP.EXE" matches pattern "gimp".
-            pats = [re.compile(p, re.IGNORECASE) for p in app["patterns"]]
+            pats = [re.compile(p, re.IGNORECASE) for p in patterns if isinstance(p, str)]
         except re.error as e:
-            print(f"WARNING: bad regex in '{app['name']}': {e}", file=sys.stderr)
-            missing.append(app["name"])
+            print(f"WARNING: bad regex in '{name}': {e}", file=sys.stderr)
+            missing.append(str(name))
+            continue
+        if not pats:
+            missing.append(str(name))
             continue
         hit = None
         for c in candidates:
@@ -883,11 +910,14 @@ def discover_apps(apps):
                 hit = c
                 break
         if hit:
-            found.append(
-                {"name": app["name"], "path": hit, "args": list(app.get("args", []))}
-            )
+            args = app.get("args", [])
+            if isinstance(args, str):
+                args = shlex.split(args, posix=(os.name == "posix"))
+            elif not isinstance(args, list):
+                args = []
+            found.append({"name": name, "path": hit, "args": args})
         else:
-            missing.append(app["name"])
+            missing.append(str(name))
     return found, missing
 
 
