@@ -40,6 +40,7 @@ kiosk_launcher.py           # the entire application (single file)
 apps.json                   # app search templates (editable, copyable)
 Kiosk.spec                  # PyInstaller spec (windowed build, bundles apps.json)
 kiosk-watchdog.bat          # Windows: relaunch the launcher on crash
+kiosk-shell.bat             # Windows: enable/disable the registry kiosk shell
 tests/test_kiosk_launcher.py
 tests/test_gui.py           # QTest behavior tests (clicks, dialogs, live reload)
 AGENT.md                    # guidance for AI coding agents
@@ -174,23 +175,27 @@ Then choose one mode:
 
 #### Mode B — replace explorer.exe (true kiosk shell, works on Home + Pro)
 
-Run these **as the Student user** (or under their HKCU):
+The repo includes `kiosk-shell.bat` to do this safely.
+
+Enable (run **as the Student user**):
 
 ```bat
-reg add "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" ^
-    /v Shell /t REG_SZ /d "C:\Kiosk\Kiosk.exe" /f
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" ^
-    /v DisableTaskMgr /t REG_DWORD /d 1 /f
+C:\Kiosk\kiosk-shell.bat enable
 ```
 
+This sets the student's shell to `C:\Kiosk\Kiosk.exe` and disables Task
+Manager, Lock, and Change Password for that user. Log off and back on.
+
 > Do **not** set the HKLM `Shell` value or you can lock yourself out. Keep the
-> Admin account on the normal explorer shell. Recovery from the Admin account:
->
-> ```bat
-> reg load HKU\Student C:\Users\Student\NTUSER.DAT
-> reg add "HKU\Student\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f
-> reg unload HKU\Student
-> ```
+> Admin account on the normal explorer shell.
+
+Recovery (run **as an Administrator**, with the student logged off):
+
+```bat
+C:\Kiosk\kiosk-shell.bat disable Student
+```
+
+This restores `explorer.exe` and re-enables the CAD options for the student.
 
 #### Verify on each client
 

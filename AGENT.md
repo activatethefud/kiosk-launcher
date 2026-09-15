@@ -17,6 +17,7 @@ tests/test_gui.py       # QTest behavior tests (clicks, dialogs, live reload)
 apps.json              # app search templates (editable, copyable, TRACKED in git)
 Kiosk.spec             # PyInstaller spec: windowed build, bundles apps.json
 kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
+kiosk-shell.bat        # Windows: enable/disable the registry kiosk shell (Plan B)
 README.md              # user-facing docs + Windows shell deployment recipe
 AGENT.md               # this file
 .gitattributes         # CRLF for *.bat on checkout
