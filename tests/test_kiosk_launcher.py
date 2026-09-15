@@ -373,6 +373,54 @@ class TestBuiltinPresets(unittest.TestCase):
         ):
             self.assertNotIn(banned, names)
 
+    def test_office_exes_match(self):
+        candidates = {
+            r"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\POWERPNT.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\ONENOTE.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\MSACCESS.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\MSPUB.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\VISIO.EXE",
+            r"C:\Program Files\Microsoft Office\root\Office16\WINPROJ.EXE",
+        }
+        names = {
+            "Microsoft Excel", "Microsoft PowerPoint", "Microsoft Outlook",
+            "Microsoft OneNote", "Microsoft Access", "Microsoft Publisher",
+            "Microsoft Visio", "Microsoft Project",
+        }
+        apps = [a for a in k.BUILTIN_APPS if a["name"] in names]
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual({a["name"] for a in found}, names)
+        self.assertEqual(missing, [])
+
+    def test_vim_matches_gvim_not_neovim(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "Vim"]
+        candidates = {r"C:\Vim\vim91\gvim.exe", "/usr/bin/vim"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+        # neovim/nvim must NOT match the anchored "vim" pattern
+        with mock.patch.object(
+            k, "gather_candidates", return_value={"/usr/bin/nvim", "/usr/bin/neovim"}
+        ):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["Vim"])
+
+    def test_notepadpp_and_sublime_match(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] in ("Notepad++", "Sublime Text")]
+        candidates = {
+            r"C:\Program Files\Notepad++\notepad++.exe",
+            r"C:\Program Files\Sublime Text\sublime_text.exe",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual({a["name"] for a in found}, {"Notepad++", "Sublime Text"})
+        self.assertEqual(missing, [])
+
 
 class TestHotkeyBlocking(unittest.TestCase):
     def test_win_keys_always_blocked(self):

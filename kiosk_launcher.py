@@ -62,6 +62,46 @@ BUILTIN_APPS = [
         "patterns": [r"winword(?:\.exe)?$"],
         "args": [],
     },
+    {
+        "name": "Microsoft Excel",
+        "patterns": [r"excel(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft PowerPoint",
+        "patterns": [r"powerpnt(?:\.exe)?$", r"powerpoint(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft Outlook",
+        "patterns": [r"outlook(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft OneNote",
+        "patterns": [r"onenote(?:m)?(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft Access",
+        "patterns": [r"msaccess(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft Publisher",
+        "patterns": [r"mspub(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft Visio",
+        "patterns": [r"visio(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Microsoft Project",
+        "patterns": [r"winproj(?:\.exe)?$"],
+        "args": [],
+    },
     # Coding / creativity
     {
         "name": "Scratch",
@@ -76,6 +116,68 @@ BUILTIN_APPS = [
     {
         "name": "VSCodium",
         "patterns": [r"codium(?:\.exe)?$", r"vscodium(?:\.exe)?$"],
+        "args": [],
+    },
+    # Text editors
+    {
+        "name": "Notepad++",
+        "patterns": [r"notepad\+\+(?:portable)?(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Sublime Text",
+        "patterns": [r"sublime_text(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "gedit",
+        "patterns": [r"gedit(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Kate",
+        "patterns": [r"kate(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Vim",
+        "patterns": [r"(?:^|[\\/])g?vim(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Emacs",
+        "patterns": [r"(?:run)?emacs(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Geany",
+        "patterns": [r"geany(?:\.exe)?$"],
+        "args": [],
+    },
+    # IDEs / dev editors
+    {
+        "name": "PyCharm",
+        "patterns": [r"pycharm(?:64)?(?:\.exe|\.sh)?$"],
+        "args": [],
+    },
+    {
+        "name": "IntelliJ IDEA",
+        "patterns": [r"idea64(?:\.exe|\.sh)?$", r"(?:^|[\\/])idea(?:\.exe|\.sh)?$"],
+        "args": [],
+    },
+    {
+        "name": "Eclipse",
+        "patterns": [r"eclipse(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Code::Blocks",
+        "patterns": [r"codeblocks(?:\.exe)?$"],
+        "args": [],
+    },
+    {
+        "name": "Dev-C++",
+        "patterns": [r"devcpp(?:portable)?(?:\.exe)?$"],
         "args": [],
     },
     # Graphics
@@ -300,6 +402,26 @@ EMOJI = {
     "fritzing": "\U0001F50B",
     "anki": "\U0001F0CF",
     "musescore": "\U0001F3BC",
+    "microsoft excel": "\U0001F4CA",
+    "microsoft powerpoint": "\U0001F4FD\uFE0F",
+    "microsoft outlook": "\U0001F4E7",
+    "microsoft onenote": "\U0001F4D3",
+    "microsoft access": "\U0001F5C4\uFE0F",
+    "microsoft publisher": "\U0001F4F0",
+    "microsoft visio": "\U0001F9E9",
+    "microsoft project": "\U0001F4C5",
+    "notepad++": "\U0001F4DD",
+    "sublime text": "\u2728",
+    "gedit": "\U0001F4C3",
+    "kate": "\U0001F58A\uFE0F",
+    "vim": "\u2328\uFE0F",
+    "emacs": "\U0001F5A5\uFE0F",
+    "geany": "\U0001F6E0\uFE0F",
+    "pycharm": "\U0001F40D",
+    "intellij idea": "\U0001F4A1",
+    "eclipse": "\U0001F311",
+    "code::blocks": "\U0001F9F1",
+    "dev-c++": "\U0001F527",
 }
 DEFAULT_EMOJI = "\U0001F680"
 

@@ -15,6 +15,63 @@
     "args": []
   },
   {
+    "name": "Microsoft Excel",
+    "patterns": [
+      "excel(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft PowerPoint",
+    "patterns": [
+      "powerpnt(?:\\.exe)?$",
+      "powerpoint(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft Outlook",
+    "patterns": [
+      "outlook(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft OneNote",
+    "patterns": [
+      "onenote(?:m)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft Access",
+    "patterns": [
+      "msaccess(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft Publisher",
+    "patterns": [
+      "mspub(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft Visio",
+    "patterns": [
+      "visio(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Microsoft Project",
+    "patterns": [
+      "winproj(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
     "name": "Scratch",
     "patterns": [
       "scratch(?: ?3|desktop|2)?(?:\\.exe)?$"
@@ -34,6 +91,91 @@
     "patterns": [
       "codium(?:\\.exe)?$",
       "vscodium(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Notepad++",
+    "patterns": [
+      "notepad\\+\\+(?:portable)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Sublime Text",
+    "patterns": [
+      "sublime_text(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "gedit",
+    "patterns": [
+      "gedit(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Kate",
+    "patterns": [
+      "kate(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Vim",
+    "patterns": [
+      "(?:^|[\\\\/])g?vim(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Emacs",
+    "patterns": [
+      "(?:run)?emacs(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Geany",
+    "patterns": [
+      "geany(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "PyCharm",
+    "patterns": [
+      "pycharm(?:64)?(?:\\.exe|\\.sh)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "IntelliJ IDEA",
+    "patterns": [
+      "idea64(?:\\.exe|\\.sh)?$",
+      "(?:^|[\\\\/])idea(?:\\.exe|\\.sh)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Eclipse",
+    "patterns": [
+      "eclipse(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Code::Blocks",
+    "patterns": [
+      "codeblocks(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "Dev-C++",
+    "patterns": [
+      "devcpp(?:portable)?(?:\\.exe)?$"
     ],
     "args": []
   },
