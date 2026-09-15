@@ -2,6 +2,12 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.4.1] - 2026-09-15
+
+- `kiosk-shell.bat` now self-elevates (UAC) and defaults to the offline
+  `Student` hive, since the per-user `Shell` key can't be written unelevated
+  on many machines.
+
 ## [0.4.0] - 2026-09-15
 
 - `kiosk-shell.bat`: added `check` subcommand and offline `enable <Username>`,

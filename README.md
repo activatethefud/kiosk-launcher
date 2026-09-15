@@ -175,18 +175,15 @@ Then choose one mode:
 
 #### Mode B — replace explorer.exe (true kiosk shell, works on Home + Pro)
 
-The repo includes `kiosk-shell.bat` to do this safely.
+The repo includes `kiosk-shell.bat` to do this safely. It **self-elevates**
+(UAC prompt) and writes to the student's offline registry hive, so the
+student account is always targeted correctly.
 
-Enable — either run it **as the Student user**:
-
-```bat
-C:\Kiosk\kiosk-shell.bat enable
-```
-
-or, as an Administrator, target the student directly (student can stay logged off):
+Enable (the target user must be logged off):
 
 ```bat
-C:\Kiosk\kiosk-shell.bat enable Student
+C:\Kiosk\kiosk-shell.bat enable            (defaults to "Student")
+C:\Kiosk\kiosk-shell.bat enable TheirName  (other username)
 ```
 
 This sets the student's shell to `C:\Kiosk\Kiosk.exe` and disables Task
@@ -195,14 +192,14 @@ Manager, Lock, and Change Password for that user. Log off and back on.
 Check what's currently set (to diagnose "works on one PC, not another"):
 
 ```bat
-C:\Kiosk\kiosk-shell.bat check           (as the student)
-C:\Kiosk\kiosk-shell.bat check Student   (as admin)
+C:\Kiosk\kiosk-shell.bat check             (run AS the student, no admin)
+C:\Kiosk\kiosk-shell.bat check Student     (run as admin, student logged off)
 ```
 
 > Do **not** set the HKLM `Shell` value or you can lock yourself out. Keep the
 > Admin account on the normal explorer shell.
 
-Recovery (run **as an Administrator**, with the student logged off):
+Recovery (run as admin, with the student logged off):
 
 ```bat
 C:\Kiosk\kiosk-shell.bat disable Student
