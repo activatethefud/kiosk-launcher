@@ -41,6 +41,7 @@ apps.json                   # app search templates (editable, copyable)
 Kiosk.spec                  # PyInstaller spec (windowed build, bundles apps.json)
 kiosk-watchdog.bat          # Windows: relaunch the launcher on crash
 kiosk-shell.bat             # Windows: enable/disable the registry kiosk shell
+install.bat                 # Windows: one-shot client installer (copy + enable)
 tests/test_kiosk_launcher.py
 tests/test_gui.py           # QTest behavior tests (clicks, dialogs, live reload)
 AGENT.md                    # guidance for AI coding agents
@@ -180,11 +181,19 @@ Then choose one mode:
 
 #### Mode B — replace explorer.exe (true kiosk shell, works on Home + Pro)
 
-The repo includes `kiosk-shell.bat` to do this safely. It **self-elevates**
-(UAC prompt) and writes to the student's offline registry hive, so the
-student account is always targeted correctly.
+The repo includes `kiosk-shell.bat` to do this safely, plus a one-shot
+`install.bat` (self-elevates, copies everything to `C:\Kiosk`, enables the
+shell). It **self-elevates** (UAC prompt) and writes to the student's offline
+registry hive, so the student account is always targeted correctly.
 
-Enable (the target user must be logged off):
+Enable (the target user must be logged off) — quickest way:
+
+```bat
+install.bat              (defaults to "Student")
+install.bat TheirName    (other username)
+```
+
+Or use `kiosk-shell.bat` directly:
 
 ```bat
 C:\Kiosk\kiosk-shell.bat enable            (defaults to "Student")

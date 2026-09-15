@@ -2,6 +2,11 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.6.0] - 2026-09-15
+
+- Added `install.bat`: one-shot client installer (self-elevates, copies to
+  `C:\Kiosk`, enables the kiosk shell). Bundled into the CI release zip.
+
 ## [0.5.0] - 2026-09-15
 
 - GitHub Actions workflow: runs the test suite, builds the bundled Windows

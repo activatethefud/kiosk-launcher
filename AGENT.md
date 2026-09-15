@@ -19,6 +19,7 @@ Kiosk.spec             # PyInstaller spec: windowed build, bundles apps.json
 .github/workflows/build.yml  # CI: run tests + build Kiosk-windows.zip
 kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
 kiosk-shell.bat        # Windows: enable/disable the registry kiosk shell (Plan B)
+install.bat            # Windows: one-shot client installer (copy to C:\Kiosk + enable)
 diagnose-windows.ps1   # Windows: machine-level diagnostic (VC++ runtime, Qt plugin, event log)
 README.md              # user-facing docs + Windows shell deployment recipe
 AGENT.md               # this file
