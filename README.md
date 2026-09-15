@@ -256,6 +256,25 @@ Look at `kiosk-error.log` next to the exe on the failing machine:
 - Also check **Event Viewer → Windows Logs → Application** for the crash
   record.
 
+#### Two diagnostic tools (report back with these)
+
+1. **In-app report** — works even in the windowed build (writes to a file):
+   ```powershell
+   C:\Kiosk\Kiosk.exe --diagnose
+   ```
+   Writes `C:\Kiosk\kiosk-diagnose.log`: Python/PySide6/Qt versions, screen
+   size + DPI, discovery results, config/apps paths, and relevant env vars.
+
+2. **Machine-level report** — PowerShell, run from any folder:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File diagnose-windows.ps1
+   ```
+   Writes `C:\Kiosk\kiosk-diagnose.txt`: OS build, VC++ runtime DLL presence,
+   whether `qwindows.dll` is bundled, contents of `kiosk-error.log` /
+   `kiosk-diagnose.log`, GPU/driver, and recent Kiosk crash events.
+
+Send both files back and the exact cause will be obvious from them.
+
 ### Hotkey lockdown (kiosk mode)
 
 In `--kiosk` mode, escape attempts ask for the admin password instead:

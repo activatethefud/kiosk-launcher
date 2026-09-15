@@ -35,6 +35,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import secrets
 import shlex
@@ -133,7 +134,7 @@ BUILTIN_APPS = [
     },
     {
         "name": "gedit",
-        "patterns": [r"gedit(?:\.exe)?$"],
+        "patterns": [r"(?:^|[\\/])gedit(?:\.exe)?$"],
         "args": [],
     },
     {
@@ -148,7 +149,7 @@ BUILTIN_APPS = [
     },
     {
         "name": "Emacs",
-        "patterns": [r"(?:run)?emacs(?:\.exe)?$"],
+        "patterns": [r"(?:^|[\\/])(?:run)?emacs(?:\.exe)?$"],
         "args": [],
     },
     {
@@ -484,6 +485,10 @@ def auto_columns(viewport_width, card_width, spacing=GRID_SPACING, margin=GRID_M
 
 def error_log_path():
     return os.path.join(_base_dir(), "kiosk-error.log")
+
+
+def diagnose_log_path():
+    return os.path.join(_base_dir(), "kiosk-diagnose.log")
 
 
 def fatal_error(message):
@@ -1176,6 +1181,78 @@ def cmd_set_password(args):
     print(f"Password updated in {path}")
 
 
+def cmd_diagnose(args):
+    """Write a diagnostic report to kiosk-diagnose.log and print it."""
+    lines = []
+
+    def w(s=""):
+        lines.append(str(s))
+
+    w(f"{APP_NAME} v{VERSION} diagnostic")
+    w(f"time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    w(f"python: {sys.version.split()[0]}")
+    w(f"executable: {sys.executable}")
+    w(f"frozen: {getattr(sys, 'frozen', False)}")
+    w(f"platform: {platform.platform()}")
+    w(f"os.name: {os.name}  machine: {platform.machine()}")
+    w(f"base_dir: {_base_dir()}")
+    for label, p in (
+        ("config", default_config_path()),
+        ("apps", default_apps_path()),
+        ("error_log", error_log_path()),
+    ):
+        w(f"{label}: {p}  exists={os.path.exists(p)}")
+
+    w("")
+    w("--- Qt ---")
+    try:
+        import PySide6
+        from PySide6.QtCore import qVersion
+        w(f"PySide6: {PySide6.__version__}  Qt: {qVersion()}")
+    except Exception as e:
+        w(f"PySide6 import FAILED: {e!r}")
+
+    try:
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance() or QApplication([])
+        for i, scr in enumerate(QApplication.screens()):
+            g = scr.geometry()
+            w(f"screen{i}: {g.width()}x{g.height()} dpr={scr.devicePixelRatio():.2f}")
+    except Exception as e:
+        w(f"QApplication/screens FAILED: {e!r}")
+
+    w("")
+    w("--- Discovery ---")
+    try:
+        apps, apps_path = load_apps(args.apps or default_apps_path())
+        candidates = gather_candidates()
+        found, missing = discover_apps(apps)
+        w(f"templates: {len(apps)} from {apps_path}")
+        w(f"candidates: {len(candidates)}")
+        w(f"found ({len(found)}):")
+        for a in found:
+            w(f"  - {a['name']}: {a['path']}")
+        w("missing: " + (", ".join(missing) if missing else "(none)"))
+    except Exception as e:
+        w(f"discovery FAILED: {e!r}")
+
+    w("")
+    w("--- Environment ---")
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramData", "LOCALAPPDATA", "PATH"):
+        w(f"{var}: {os.environ.get(var, '')}")
+
+    report = "\n".join(lines) + "\n"
+    path = diagnose_log_path()
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(report)
+    except OSError as e:
+        print(f"could not write {path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Diagnostic written to {path}")
+    print(report)
+
+
 # ==========================================================================
 # GUI
 # ==========================================================================
@@ -1657,6 +1734,7 @@ def main():
     parser.add_argument("--apps", help="path to apps.json (app search templates)")
     parser.add_argument("--scan", action="store_true", help="print discovery results and exit")
     parser.add_argument("--set-password", action="store_true", help="change the admin password and exit")
+    parser.add_argument("--diagnose", action="store_true", help="write a diagnostic report and exit")
     parser.add_argument("--kiosk", action="store_true", help="frameless fullscreen, exit requires password")
     parser.add_argument("--windowed", action="store_true", help="force windowed mode")
     parser.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
@@ -1667,6 +1745,8 @@ def main():
             cmd_set_password(args)
         elif args.scan:
             cmd_scan(args)
+        elif args.diagnose:
+            cmd_diagnose(args)
         else:
             run_gui(args)
     except SystemExit:

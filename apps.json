@@ -111,7 +111,7 @@
   {
     "name": "gedit",
     "patterns": [
-      "gedit(?:\\.exe)?$"
+      "(?:^|[\\\\/])gedit(?:\\.exe)?$"
     ],
     "args": []
   },
@@ -132,7 +132,7 @@
   {
     "name": "Emacs",
     "patterns": [
-      "(?:run)?emacs(?:\\.exe)?$"
+      "(?:^|[\\\\/])(?:run)?emacs(?:\\.exe)?$"
     ],
     "args": []
   },

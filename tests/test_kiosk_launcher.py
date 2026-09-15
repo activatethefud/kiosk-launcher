@@ -577,6 +577,29 @@ class TestBuiltinPresets(unittest.TestCase):
         self.assertEqual({a["name"] for a in found}, {"Notepad++", "Sublime Text"})
         self.assertEqual(missing, [])
 
+    def test_gedit_does_not_match_regedit(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "gedit"]
+        with mock.patch.object(k, "gather_candidates", return_value={"/bin/regedit"}):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["gedit"])
+        with mock.patch.object(k, "gather_candidates", return_value={"/bin/gedit"}):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+
+    def test_emacs_does_not_match_ctags_emacs(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "Emacs"]
+        with mock.patch.object(k, "gather_candidates", return_value={"/bin/ctags.emacs"}):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["Emacs"])
+        with mock.patch.object(
+            k, "gather_candidates",
+            return_value={r"C:\Program Files\Emacs\emacs\bin\runemacs.exe"},
+        ):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+
 
 class TestHotkeyBlocking(unittest.TestCase):
     def test_win_keys_always_blocked(self):
@@ -811,6 +834,23 @@ class TestCliAndBuild(unittest.TestCase):
         self.assertIn("Alpha", text)
         self.assertIn("/x/alpha", text)
         self.assertIn("Beta", text)
+
+    def test_cmd_diagnose_writes_report(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        args = k.argparse.Namespace(config=None, apps=None)
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(k, "_base_dir", return_value=tmp), \
+                 mock.patch.object(k, "load_apps", return_value=([], os.path.join(tmp, "apps.json"))), \
+                 mock.patch.object(k, "gather_candidates", return_value=set()), \
+                 mock.patch.object(k, "discover_apps", return_value=([], [])), \
+                 mock.patch("sys.stdout", new_callable=io.StringIO):
+                k.cmd_diagnose(args)
+            report = os.path.join(tmp, "kiosk-diagnose.log")
+            self.assertTrue(os.path.exists(report))
+            with open(report, encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("diagnostic", content.lower())
+            self.assertIn("python", content.lower())
 
 
 class TestDesktopExecPaths(unittest.TestCase):

@@ -6,6 +6,7 @@ venv/
 # runtime-generated, machine-specific
 kiosk_config.json
 kiosk-error.log
+kiosk-diagnose.log
 
 # PyInstaller artifacts
 build/

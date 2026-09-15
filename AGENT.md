@@ -18,6 +18,7 @@ apps.json              # app search templates (editable, copyable, TRACKED in gi
 Kiosk.spec             # PyInstaller spec: windowed build, bundles apps.json
 kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
 kiosk-shell.bat        # Windows: enable/disable the registry kiosk shell (Plan B)
+diagnose-windows.ps1   # Windows: machine-level diagnostic (VC++ runtime, Qt plugin, event log)
 README.md              # user-facing docs + Windows shell deployment recipe
 AGENT.md               # this file
 .gitattributes         # CRLF for *.bat on checkout
@@ -114,7 +115,7 @@ Top-level functions (module `kiosk_launcher`):
   debounced `QTimer` live-reloads `apps.json` when it changes on disk. `run_gui`
   builds `QApplication` + `MainWindow`, starts the Windows hotkey blocker in
   kiosk mode, and runs the event loop.
-- CLI modes: `cmd_scan(args)`, `cmd_set_password(args)`.
+- CLI modes: `cmd_scan(args)`, `cmd_set_password(args)`, `cmd_diagnose(args)`.
 
 ### Discovery (the important part)
 
