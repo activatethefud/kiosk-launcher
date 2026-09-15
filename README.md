@@ -367,4 +367,4 @@ App templates (`apps.json`):
 
 ## License
 
-MIT — use it however you like in your lab.
+GNU General Public License v3.0 or later — see [LICENSE](LICENSE).
