@@ -147,6 +147,29 @@ Top-level functions (module `kiosk_launcher`):
   the offscreen platform (set at the top of the file).
 - New behavior should come with a test in `tests/test_kiosk_launcher.py`.
 
+## Versioning (handled automatically by the agent)
+
+You are responsible for keeping the version current — the user should not have
+to ask. Follow **SemVer** (`MAJOR.MINOR.PATCH`) and bump based on the size of
+the change:
+
+- **MAJOR** (`x.0.0`): breaking changes — config/`apps.json` format changes,
+  removed features, or anything that breaks existing deployments.
+- **MINOR** (`x.y.0`): new user-visible features or meaningful additions
+  (new presets, new modes, new helper scripts, diagnostics, etc.).
+- **PATCH** (`x.y.z`): bug fixes, robustness hardening, false-positive fixes,
+  refactors with no behavior change, docs-only and test-only changes.
+
+When bumping, keep all three in sync:
+
+1. `VERSION` in `kiosk_launcher.py`
+2. a new entry in `CHANGELOG.md` under the new version
+3. an annotated git tag: `git tag v<X.Y.Z>`
+
+Judgment: a small one-off fix that lands the same day as an existing
+unreleased version does not need another bump — fold it into the current
+version's changelog entry. Trivial doc/test tweaks may skip a bump entirely.
+
 ## Deployment notes (Windows custom shell)
 
 Freeze with PyInstaller (`--onefile --windowed`), then set the shell per-user:
