@@ -225,6 +225,24 @@ or run the existing exe from a terminal:
 .\dist\Kiosk\Kiosk.exe
 ```
 
+#### "PySide6 is required" / missing Qt DLLs
+
+This almost always means PyInstaller didn't bundle Qt. In order of likelihood:
+
+1. Build in the **same Python environment** where PySide6 is installed:
+   ```powershell
+   python -m pip install pyinstaller pyside6-essentials
+   python -c "import PySide6.QtWidgets; print('ok')"
+   python -m PyInstaller --noconfirm --clean Kiosk.spec
+   ```
+   (`python -m PyInstaller` guarantees you use the same interpreter.)
+2. `Kiosk.spec` now **force-collects PySide6** (`collect_all`), so rebuilding
+   with the spec pulls in every Qt DLL and platform plugin.
+3. Use **`--onedir`** (the spec's default), **not `--onefile`** — onefile
+   extracts to a temp dir at runtime and antivirus often quarantines the
+   extracted Qt DLLs, which produces exactly this symptom.
+4. As a last resort, add `--collect-all PySide6` on the command line.
+
 ### Hotkey lockdown (kiosk mode)
 
 In `--kiosk` mode, escape attempts ask for the admin password instead:
