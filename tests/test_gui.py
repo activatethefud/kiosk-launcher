@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (  # noqa: E402
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
 )
 
 _APP = None
@@ -309,6 +310,40 @@ class TestKioskBehavior(GuiTestBase):
             QTest.qWait(900)  # debounce (400ms) + reload + rebuild
             self.assertEqual(len(win.apps), 3)
             self.assertEqual(len(self._app_buttons(win)), 3)
+
+
+class TestLayoutAndOverflow(GuiTestBase):
+    def test_kiosk_fullscreen_matches_screen(self):
+        win, *_ = self.make_window(kiosk=True, password="secret")
+        win.showFullScreen()
+        QTest.qWait(300)
+        screen = QApplication.primaryScreen()
+        self.assertEqual(win.size(), screen.geometry().size())
+        self.assertTrue(win.windowFlags() & Qt.FramelessWindowHint)
+
+    def test_many_apps_scroll_not_overflow(self):
+        apps = [
+            {"name": f"App{i}", "patterns": [f"app{i}$"], "args": []}
+            for i in range(40)
+        ]
+        found = [
+            {"name": a["name"], "path": "/x/" + a["name"], "args": []}
+            for a in apps
+        ]
+        with mock.patch.object(k, "discover_apps", return_value=(found, [])):
+            win, *_ = self.make_window(kiosk=False)
+        QTest.qWait(300)
+
+        # Window stays at its configured size — it does not grow to fit 40 apps.
+        self.assertEqual((win.width(), win.height()), (1000, 700))
+        scroll = win.findChild(QScrollArea)
+        self.assertIsNotNone(scroll)
+        # Overflow becomes a vertical scrollbar, never a horizontal one.
+        self.assertGreater(scroll.verticalScrollBar().maximum(), 0)
+        self.assertEqual(scroll.horizontalScrollBar().maximum(), 0)
+        # Buttons keep their fixed size — they are never stretched.
+        for b in self._app_buttons(win)[:5]:
+            self.assertEqual((b.width(), b.height()), (180, 130))
 
 
 if __name__ == "__main__":
