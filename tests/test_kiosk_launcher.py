@@ -174,6 +174,12 @@ class TestAppTemplates(unittest.TestCase):
         self.assertEqual(len(apps), 1)
         self.assertEqual(apps[0]["name"], "X")
 
+    def test_load_apps_dict_with_nonlist_apps_seeds(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump({"apps": "notalist"}, f)
+        apps, _ = k.load_apps(self.path)
+        self.assertEqual(apps, k.BUILTIN_APPS)
+
     def test_normalize_coerces_string_patterns_and_args(self):
         data = [{"name": "X", "patterns": "x$", "args": "--flag --two"}]
         with open(self.path, "w", encoding="utf-8") as f:
@@ -239,6 +245,9 @@ class TestAppTemplates(unittest.TestCase):
 
     def test_normalize_app_rejects_nonstring_name(self):
         self.assertIsNone(k.normalize_app({"name": 123, "patterns": ["x$"], "args": []}))
+
+    def test_normalize_app_rejects_whitespace_name(self):
+        self.assertIsNone(k.normalize_app({"name": "   ", "patterns": ["x$"], "args": []}))
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +339,13 @@ class TestDiscovery(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertEqual(missing, [])
 
+    def test_discover_apps_filters_nonstring_patterns(self):
+        apps = [{"name": "A", "patterns": [123, "a$", None], "args": []}]
+        with mock.patch.object(k, "gather_candidates", return_value={"/x/a"}):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(missing, [])
+
     def test_gather_candidates_includes_path_entries(self):
         with tempfile.TemporaryDirectory() as tmp:
             exe = os.path.join(tmp, "someapp")
@@ -363,6 +379,34 @@ class TestDiscovery(unittest.TestCase):
                 with mock.patch.object(k, "_registry_app_paths", return_value=set()):
                     candidates = k.gather_candidates()
         self.assertEqual(candidates, set())
+
+    def test_gather_candidates_windows_branch_collects_exe(self):
+        with tempfile.TemporaryDirectory() as pf:
+            exe = os.path.join(pf, "app.exe")
+            txt = os.path.join(pf, "note.txt")
+            for p in (exe, txt):
+                with open(p, "w"):
+                    pass
+            env = {"ProgramFiles": pf, "ProgramFiles(x86)": pf,
+                   "ProgramData": pf, "LOCALAPPDATA": pf, "PATH": pf}
+            with mock.patch.dict(os.environ, env):
+                with mock.patch.object(k.os, "name", "nt"):
+                    with mock.patch.object(k, "_registry_app_paths", return_value=set()):
+                        cands = k.gather_candidates()
+            self.assertIn(exe, cands)
+            self.assertNotIn(txt, cands)
+
+    def test_registry_app_paths_handles_missing_winreg(self):
+        real_import = __import__
+
+        def fake_import(name, *a, **kw):
+            if name == "winreg":
+                raise ImportError("no winreg")
+            return real_import(name, *a, **kw)
+
+        with mock.patch.object(k.os, "name", "nt"):
+            with mock.patch("builtins.__import__", side_effect=fake_import):
+                self.assertEqual(k._registry_app_paths(), set())
 
 
 class TestBuiltinPresets(unittest.TestCase):
@@ -858,6 +902,24 @@ class TestLaunch(unittest.TestCase):
         self.assertIsNone(err)
         m.assert_called_once()
         self.assertEqual(m.call_args[0][0], ["/bin/x", "--flag", "--two"])
+
+    def test_launch_windows_windowsapps_branch(self):
+        path = r"C:\Users\kid\AppData\Local\Microsoft\WindowsApps\foo.exe"
+        with mock.patch.object(k.os, "name", "nt"):
+            with mock.patch.object(k.subprocess, "Popen") as m:
+                err = k.launch({"path": path, "args": ["--x"]})
+        self.assertIsNone(err)
+        m.assert_called_once()
+        self.assertEqual(m.call_args[0][0], ["cmd", "/c", "start", "", path, "--x"])
+
+    def test_launch_windows_normal_branch(self):
+        path = r"C:\Kiosk\Kiosk.exe"
+        with mock.patch.object(k.os, "name", "nt"):
+            with mock.patch.object(k.subprocess, "Popen") as m:
+                err = k.launch({"path": path, "args": []})
+        self.assertIsNone(err)
+        m.assert_called_once()
+        self.assertEqual(m.call_args[0][0], [path])
 
 
 if __name__ == "__main__":

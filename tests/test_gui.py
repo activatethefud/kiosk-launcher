@@ -180,6 +180,23 @@ class TestGridAndLaunch(GuiTestBase):
         self.assertEqual(m.call_args[0][0]["name"], "Alpha")
         self.assertEqual(m.call_args[0][0]["args"], ["--x"])
 
+    def test_launch_error_shows_message(self):
+        found = [{"name": "Alpha", "path": "/x/alpha", "args": []}]
+        with mock.patch.object(k, "discover_apps", return_value=(found, [])):
+            win, *_ = self.make_window()
+        seen = []
+
+        def dismiss():
+            w = _active_modal()
+            if isinstance(w, QMessageBox):
+                seen.append(w)
+                w.accept()
+
+        QTimer.singleShot(100, dismiss)
+        with mock.patch.object(k, "launch", return_value="boom"):
+            win.launch(found[0])
+        self.assertEqual(len(seen), 1)
+
 
 # ---------------------------------------------------------------------------
 # Admin flow
@@ -217,6 +234,29 @@ class TestAdminFlow(GuiTestBase):
         QTimer.singleShot(400, close_menu)
         win.on_admin()
         self.assertEqual(len(seen_menu), 1)
+
+    def test_admin_cancel_does_nothing(self):
+        win, *_ = self.make_window(password="secret")
+
+        def cancel():
+            dlg = _active_modal()
+            if dlg is not None:
+                dlg.reject()
+
+        QTimer.singleShot(100, cancel)
+        win.on_admin()
+        self.assertIsNone(_active_menu())
+
+    def test_add_app_dialog_values_direct(self):
+        dlg = k.AddAppDialog()
+        self.addCleanup(dlg.deleteLater)
+        dlg.name_edit.setText("Gamma")
+        dlg.patterns_edit.setPlainText("gamma$\nbeta$")
+        dlg.args_edit.setText("--flag --two")
+        v = dlg.values()
+        self.assertEqual(v["name"], "Gamma")
+        self.assertEqual(v["patterns"], ["gamma$", "beta$"])
+        self.assertEqual(v["args"], ["--flag", "--two"])
 
     def test_add_app_flow(self):
         win, cfg, cfg_path, apps_path, apps = self.make_window(password="secret")
@@ -352,6 +392,21 @@ class TestKioskBehavior(GuiTestBase):
         QTest.keyClick(win, Qt.Key_Escape)
         self.assertEqual(len(seen_menu), 1)
 
+    def test_f11_key_opens_admin_prompt(self):
+        win, *_ = self.make_window(kiosk=True, password="secret")
+        seen_menu = []
+
+        def close_menu():
+            menu = _active_menu()
+            if menu is not None:
+                seen_menu.append(menu)
+                menu.close()
+
+        QTimer.singleShot(100, lambda: _fill_input("secret"))
+        QTimer.singleShot(400, close_menu)
+        QTest.keyClick(win, Qt.Key_F11)
+        self.assertEqual(len(seen_menu), 1)
+
     def test_programmatic_close_does_not_prompt(self):
         win, *_ = self.make_window(kiosk=True, password="secret")
         win.close()  # non-spontaneous → must not show a password dialog
@@ -417,6 +472,11 @@ class TestTextWrapping(GuiTestBase):
         wrapped = k.wrap_text("GIMP", self._font(), 130)
         self.assertEqual(wrapped, "GIMP")
 
+    def test_wrap_text_nonstring_and_empty(self):
+        self.assertEqual(k.wrap_text(None, self._font(), 130), "")
+        self.assertEqual(k.wrap_text("", self._font(), 130), "")
+        self.assertEqual(k.wrap_text(123, self._font(), 130), "123")
+
 
 class TestLayoutAndOverflow(GuiTestBase):
     def test_kiosk_fullscreen_matches_screen(self):
@@ -458,6 +518,12 @@ class TestLayoutAndOverflow(GuiTestBase):
         btn = win.findChild(QPushButton, "app:Alpha")
         self.assertIsNotNone(btn)
         self.assertEqual((btn.width(), btn.height()), (150, 110))
+
+    def test_fixed_columns_override(self):
+        found = [{"name": f"A{i}", "path": f"/x/a{i}", "args": []} for i in range(10)]
+        with mock.patch.object(k, "discover_apps", return_value=(found, [])):
+            win, *_ = self.make_window(columns=3)
+        self.assertEqual(win._compute_columns(), 3)
 
 
 if __name__ == "__main__":
