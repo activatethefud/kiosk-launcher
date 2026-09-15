@@ -797,7 +797,11 @@ def _desktop_exec_paths():
 
 
 def gather_candidates():
-    """Return a set of candidate executable paths for this machine."""
+    """Return a set of candidate executable paths for this machine.
+
+    Individual scan failures (bad junctions, inaccessible dirs, registry
+    quirks) are swallowed so one broken path can't kill the whole launcher.
+    """
     cands = set()
 
     def add(p):
@@ -818,15 +822,24 @@ def gather_candidates():
             if d:
                 roots.append((d, 1))
         for root, depth in roots:
-            for p in _walk_depth(root, depth, exts=(".exe",)):
+            try:
+                for p in _walk_depth(root, depth, exts=(".exe",)):
+                    add(p)
+            except OSError:
+                continue
+        try:
+            for p in _registry_app_paths():
                 add(p)
-        for p in _registry_app_paths():
-            add(p)
+        except Exception:
+            pass
     else:
         for d in os.environ.get("PATH", "").split(os.pathsep):
             if d and os.path.isdir(d):
-                for fn in os.listdir(d):
-                    add(os.path.join(d, fn))
+                try:
+                    for fn in os.listdir(d):
+                        add(os.path.join(d, fn))
+                except OSError:
+                    continue
         extra = [
             "/opt",
             "/usr/local/bin",
@@ -838,10 +851,16 @@ def gather_candidates():
         ]
         for root in extra:
             if os.path.isdir(root):
-                for p in _walk_depth(root, 3):
-                    add(p)
-        for p in _desktop_exec_paths():
-            add(p)
+                try:
+                    for p in _walk_depth(root, 3):
+                        add(p)
+                except OSError:
+                    continue
+        try:
+            for p in _desktop_exec_paths():
+                add(p)
+        except Exception:
+            pass
 
     return cands
 
@@ -1554,6 +1573,18 @@ def run_gui(args):
 
 # ==========================================================================
 def main():
+    # Early startup marker. If kiosk-error.log does NOT contain a START line,
+    # the process died before Python ran (missing VC++ runtime, Qt DLL, AV
+    # quarantine, SmartScreen block) — a machine-level problem, not a code bug.
+    try:
+        with open(error_log_path(), "a", encoding="utf-8") as f:
+            f.write(
+                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] START pid={os.getpid()} "
+                f"args={list(sys.argv)}\n"
+            )
+    except OSError:
+        pass
+
     parser = argparse.ArgumentParser(
         description=f"{APP_NAME} v{VERSION} — locked-down classroom app launcher."
     )
@@ -1566,12 +1597,18 @@ def main():
     parser.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    if args.set_password:
-        cmd_set_password(args)
-    elif args.scan:
-        cmd_scan(args)
-    else:
-        run_gui(args)
+    try:
+        if args.set_password:
+            cmd_set_password(args)
+        elif args.scan:
+            cmd_scan(args)
+        else:
+            run_gui(args)
+    except SystemExit:
+        raise
+    except Exception:
+        fatal_error(traceback.format_exc())
+        sys.exit(1)
 
 
 if __name__ == "__main__":

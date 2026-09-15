@@ -254,6 +254,31 @@ class TestDiscovery(unittest.TestCase):
                 candidates = k.gather_candidates()
         self.assertIn(exe, candidates)
 
+    def test_gather_candidates_survives_bad_path_dir(self):
+        with tempfile.TemporaryDirectory() as good, \
+             tempfile.TemporaryDirectory() as bad:
+            app = os.path.join(good, "app1")
+            with open(app, "w", encoding="utf-8"):
+                pass
+            real_listdir = os.listdir
+
+            def listdir(p):
+                if os.path.normpath(p) == os.path.normpath(bad):
+                    raise OSError("boom")
+                return real_listdir(p)
+
+            with mock.patch.dict(os.environ, {"PATH": good + os.pathsep + bad}):
+                with mock.patch.object(k.os, "listdir", side_effect=listdir):
+                    candidates = k.gather_candidates()
+            self.assertIn(app, candidates)
+
+    def test_gather_candidates_survives_windows_walk_errors(self):
+        with mock.patch.object(k, "_walk_depth", side_effect=OSError("boom")):
+            with mock.patch.object(k.os, "name", "nt"):
+                with mock.patch.object(k, "_registry_app_paths", return_value=set()):
+                    candidates = k.gather_candidates()
+        self.assertEqual(candidates, set())
+
 
 class TestBuiltinPresets(unittest.TestCase):
     def test_all_builtin_patterns_compile(self):

@@ -243,6 +243,19 @@ This almost always means PyInstaller didn't bundle Qt. In order of likelihood:
    extracted Qt DLLs, which produces exactly this symptom.
 4. As a last resort, add `--collect-all PySide6` on the command line.
 
+#### Works on some machines but silently fails on one
+
+Look at `kiosk-error.log` next to the exe on the failing machine:
+
+- **No `START ...` line** → Python never started. This is a machine-level
+  problem: install the **Visual C++ Redistributable** (Qt needs
+  `vcruntime140.dll` / `msvcp140.dll`), and check antivirus quarantine and
+  SmartScreen.
+- **`START` line but nothing after it** → Python started then died early; the
+  following lines (or the message box) show the reason.
+- Also check **Event Viewer → Windows Logs → Application** for the crash
+  record.
+
 ### Hotkey lockdown (kiosk mode)
 
 In `--kiosk` mode, escape attempts ask for the admin password instead:
