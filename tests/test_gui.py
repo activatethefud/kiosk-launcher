@@ -24,6 +24,7 @@ from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
     QDialog,
+    QLabel,
     QLineEdit,
     QListWidget,
     QMenu,
@@ -524,6 +525,13 @@ class TestLayoutAndOverflow(GuiTestBase):
         with mock.patch.object(k, "discover_apps", return_value=(found, [])):
             win, *_ = self.make_window(columns=3)
         self.assertEqual(win._compute_columns(), 3)
+
+    def test_version_label_shows_version(self):
+        with mock.patch.object(k, "discover_apps", return_value=([], [])):
+            win, *_ = self.make_window()
+        lbl = win.findChild(QLabel, "version_label")
+        self.assertIsNotNone(lbl)
+        self.assertEqual(lbl.text(), f"v{k.VERSION}")
 
 
 if __name__ == "__main__":

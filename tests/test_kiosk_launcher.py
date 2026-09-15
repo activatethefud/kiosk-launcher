@@ -817,6 +817,9 @@ class TestCliAndBuild(unittest.TestCase):
         self.assertIn("console=False", spec)
         self.assertIn("upx=False", spec)
 
+    def test_version_is_semver(self):
+        self.assertRegex(k.VERSION, r"^\d+\.\d+\.\d+$")
+
     def test_cmd_scan_prints_results(self):
         args = k.argparse.Namespace(config="/tmp/c.json", apps="/tmp/a.json")
         with mock.patch.object(k, "load_config", return_value=({}, "/tmp/c.json")), \

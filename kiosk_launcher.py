@@ -46,7 +46,7 @@ import time
 import traceback
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
@@ -1418,7 +1418,7 @@ if _HAS_QT:
             self.apps = apps
             self.apps_path = apps_path
             self.kiosk = kiosk
-            self.setWindowTitle(APP_NAME)
+            self.setWindowTitle(f"{APP_NAME} v{VERSION}")
 
             root = QVBoxLayout(self)
             root.setContentsMargins(18, 18, 18, 12)
@@ -1426,6 +1426,10 @@ if _HAS_QT:
             self.status_label = QLabel("")
             self.status_label.setObjectName("status_label")
             self.status_label.setStyleSheet("color: #a6adc8; font-size: 14px;")
+
+            self.version_label = QLabel(f"v{VERSION}")
+            self.version_label.setObjectName("version_label")
+            self.version_label.setStyleSheet("color: #6c7086; font-size: 12px;")
 
             self.scroll = QScrollArea()
             self.scroll.setWidgetResizable(True)
@@ -1447,6 +1451,7 @@ if _HAS_QT:
 
             bar = QHBoxLayout()
             bar.addWidget(self.status_label, 1)
+            bar.addWidget(self.version_label)
             bar.addWidget(self.admin_btn)
 
             root.addWidget(self.scroll, 1)
@@ -1715,6 +1720,20 @@ def run_gui(args):
 
 # ==========================================================================
 def main():
+    parser = argparse.ArgumentParser(
+        description=f"{APP_NAME} v{VERSION} — locked-down classroom app launcher."
+    )
+    parser.add_argument("--config", help="path to kiosk_config.json")
+    parser.add_argument("--apps", help="path to apps.json (app search templates)")
+    parser.add_argument("--scan", action="store_true", help="print discovery results and exit")
+    parser.add_argument("--set-password", action="store_true", help="change the admin password and exit")
+    parser.add_argument("--diagnose", action="store_true", help="write a diagnostic report and exit")
+    parser.add_argument("--version", action="version", version=f"{APP_NAME} {VERSION}")
+    parser.add_argument("--kiosk", action="store_true", help="frameless fullscreen, exit requires password")
+    parser.add_argument("--windowed", action="store_true", help="force windowed mode")
+    parser.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args()
+
     # Early startup marker. If kiosk-error.log does NOT contain a START line,
     # the process died before Python ran (missing VC++ runtime, Qt DLL, AV
     # quarantine, SmartScreen block) — a machine-level problem, not a code bug.
@@ -1726,19 +1745,6 @@ def main():
             )
     except OSError:
         pass
-
-    parser = argparse.ArgumentParser(
-        description=f"{APP_NAME} v{VERSION} — locked-down classroom app launcher."
-    )
-    parser.add_argument("--config", help="path to kiosk_config.json")
-    parser.add_argument("--apps", help="path to apps.json (app search templates)")
-    parser.add_argument("--scan", action="store_true", help="print discovery results and exit")
-    parser.add_argument("--set-password", action="store_true", help="change the admin password and exit")
-    parser.add_argument("--diagnose", action="store_true", help="write a diagnostic report and exit")
-    parser.add_argument("--kiosk", action="store_true", help="frameless fullscreen, exit requires password")
-    parser.add_argument("--windowed", action="store_true", help="force windowed mode")
-    parser.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
-    args = parser.parse_args()
 
     try:
         if args.set_password:
