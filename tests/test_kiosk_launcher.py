@@ -115,6 +115,12 @@ class TestConfig(unittest.TestCase):
         cfg, _ = k.load_config(self.path)
         self.assertIn("hash", cfg["password"])
 
+    def test_save_config_creates_parent_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = os.path.join(tmp, "a", "b", "config.json")
+            k.save_config(k.seed_config(), p)
+            self.assertTrue(os.path.exists(p))
+
     def test_load_defaults_fullscreen_true(self):
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump({"columns": 3}, f)
@@ -202,6 +208,12 @@ class TestAppTemplates(unittest.TestCase):
         k.save_apps(apps, self.path)
         apps2, _ = k.load_apps(self.path)
         self.assertEqual(apps, apps2)
+
+    def test_save_apps_creates_parent_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = os.path.join(tmp, "a", "b", "apps.json")
+            k.save_apps([{"name": "A", "patterns": ["a$"], "args": []}], p)
+            self.assertTrue(os.path.exists(p))
 
     def test_normalize_app_rejects_missing_name(self):
         self.assertIsNone(k.normalize_app({"patterns": ["x$"], "args": []}))
@@ -654,6 +666,55 @@ class TestLayoutPresets(unittest.TestCase):
         self.assertEqual(k.auto_columns(1920, 220), 8)
         self.assertEqual(k.auto_columns(0, 180), 1)
 
+    def test_auto_columns_tolerates_bad_input(self):
+        self.assertEqual(k.auto_columns(None, 180), 1)
+        self.assertEqual(k.auto_columns("bogus", 180), 1)
+
+    def test_resolve_card_preset_tolerates_bad_input(self):
+        self.assertEqual(k.resolve_card_preset("auto", None), k.CARD_PRESETS["small"])
+        self.assertEqual(k.resolve_card_preset("auto", "bogus"), k.CARD_PRESETS["small"])
+
+
+class TestCliAndBuild(unittest.TestCase):
+    def test_default_paths_use_base_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(k, "_base_dir", return_value=tmp):
+                self.assertEqual(k.default_config_path(), os.path.join(tmp, "kiosk_config.json"))
+                self.assertEqual(k.default_apps_path(), os.path.join(tmp, "apps.json"))
+                self.assertEqual(k.error_log_path(), os.path.join(tmp, "kiosk-error.log"))
+
+    def test_base_dir_frozen_uses_executable_dir(self):
+        fake_exe = os.path.join("some", "dir", "Kiosk.exe")
+        with mock.patch.object(sys, "frozen", True, create=True), \
+             mock.patch.object(sys, "executable", fake_exe):
+            self.assertEqual(k._base_dir(), os.path.dirname(os.path.abspath(fake_exe)))
+
+    def test_install_excepthook_routes_to_fatal_error(self):
+        old = sys.excepthook
+        self.addCleanup(setattr, sys, "excepthook", old)
+        k._install_excepthook()
+        with mock.patch.object(k, "fatal_error") as m:
+            sys.excepthook(ValueError, ValueError("x"), None)
+        m.assert_called_once()
+
+    def test_set_password_handles_getpass_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = k.argparse.Namespace(config=os.path.join(tmp, "config.json"))
+            with mock.patch("getpass.getpass", side_effect=EOFError("no tty")):
+                with mock.patch("sys.stderr"):
+                    with self.assertRaises(SystemExit) as cm:
+                        k.cmd_set_password(args)
+            self.assertNotEqual(cm.exception.code, 0)
+
+    def test_kiosk_spec_bundles_apps_and_pyside6(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, "Kiosk.spec"), encoding="utf-8") as f:
+            spec = f.read()
+        self.assertIn("collect_all('PySide6')", spec)
+        self.assertIn("'apps.json'", spec)
+        self.assertIn("console=False", spec)
+        self.assertIn("upx=False", spec)
+
 
 class TestWalkDepth(unittest.TestCase):
     def test_respects_max_depth(self):
@@ -683,6 +744,17 @@ class TestLaunch(unittest.TestCase):
     def test_launch_ok_returns_none(self):
         err = k.launch({"path": "/bin/true", "args": []})
         self.assertIsNone(err)
+
+    def test_launch_without_path_returns_error(self):
+        self.assertIsNotNone(k.launch({"args": []}))
+        self.assertIsNotNone(k.launch({}))
+
+    def test_launch_coerces_string_args(self):
+        with mock.patch.object(k.subprocess, "Popen") as m:
+            err = k.launch({"path": "/bin/x", "args": "--flag --two"})
+        self.assertIsNone(err)
+        m.assert_called_once()
+        self.assertEqual(m.call_args[0][0], ["/bin/x", "--flag", "--two"])
 
 
 if __name__ == "__main__":

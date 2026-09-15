@@ -461,16 +461,24 @@ def resolve_card_preset(size_key, screen_width):
     """Return the card size preset for size_key ("auto"/"small"/"medium"/"large")."""
     if size_key in CARD_PRESETS:
         return CARD_PRESETS[size_key]
-    if screen_width < 1280:
+    try:
+        width = int(screen_width or 0)
+    except (TypeError, ValueError):
+        width = 0
+    if width < 1280:
         return CARD_PRESETS["small"]
-    if screen_width < 1920:
+    if width < 1920:
         return CARD_PRESETS["medium"]
     return CARD_PRESETS["large"]
 
 
 def auto_columns(viewport_width, card_width, spacing=GRID_SPACING, margin=GRID_MARGIN):
     """How many card columns fit in viewport_width (always at least 1)."""
-    usable = max(0, int(viewport_width) - margin)
+    try:
+        vw = int(viewport_width or 0)
+    except (TypeError, ValueError):
+        vw = 0
+    usable = max(0, vw - margin)
     return max(1, (usable + spacing) // (card_width + spacing))
 
 
@@ -555,7 +563,14 @@ def load_config(path):
     return cfg, path
 
 
+def _ensure_parent_dir(path):
+    d = os.path.dirname(os.path.abspath(path))
+    if d:
+        os.makedirs(d, exist_ok=True)
+
+
 def save_config(cfg, path):
+    _ensure_parent_dir(path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
 
@@ -640,6 +655,7 @@ def load_apps(path):
 
 
 def save_apps(apps, path):
+    _ensure_parent_dir(path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(apps, f, indent=2, ensure_ascii=False)
 
@@ -928,8 +944,14 @@ _children = []
 
 def launch(app):
     """Launch a discovered app without waiting. Returns None or error str."""
-    path = app["path"]
-    args = list(app.get("args", []))
+    path = app.get("path") if isinstance(app, dict) else None
+    if not path:
+        return "no executable path"
+    args = app.get("args", [])
+    if isinstance(args, str):
+        args = shlex.split(args, posix=(os.name == "posix"))
+    elif not isinstance(args, list):
+        args = []
     cwd = os.path.dirname(path) or None
     try:
         if os.name == "nt":
@@ -1130,8 +1152,12 @@ def cmd_set_password(args):
     import getpass
 
     cfg, path = load_config(args.config or default_config_path())
-    pw1 = getpass.getpass("New admin password: ")
-    pw2 = getpass.getpass("Confirm password: ")
+    try:
+        pw1 = getpass.getpass("New admin password: ")
+        pw2 = getpass.getpass("Confirm password: ")
+    except (EOFError, OSError) as e:
+        print(f"Cannot read password: {e}", file=sys.stderr)
+        sys.exit(1)
     if pw1 != pw2:
         print("Passwords do not match.", file=sys.stderr)
         sys.exit(1)
@@ -1184,6 +1210,8 @@ if _HAS_QT:
 
     def wrap_text(text, font, max_width):
         """Wrap text with newlines so each line fits within max_width pixels."""
+        if not isinstance(text, str):
+            text = str(text or "")
         fm = QFontMetrics(font)
         lines = []
         current = ""
