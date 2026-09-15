@@ -149,6 +149,11 @@ pyinstaller --noconfirm --clean Kiosk.spec
 - `Kiosk.spec` bundles `apps.json`, keeps the build windowed, and enables
   PyInstaller's own crash dialog as a fallback.
 - Output: `dist\Kiosk\Kiosk.exe`
+- **Or let CI build it:** a push runs
+  [`.github/workflows/build.yml`](.github/workflows/build.yml) — it runs the
+  test suite, then builds `Kiosk-windows.zip` (PySide6 + `apps.json` bundled).
+  Download it from the repo's **Actions** tab; pushing a `v*` tag also attaches
+  it to a GitHub Release. No Windows machine needed.
 
 ### 2. Client install (repeat on every lab machine)
 

@@ -2,6 +2,11 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.5.0] - 2026-09-15
+
+- GitHub Actions workflow: runs the test suite, builds the bundled Windows
+  `Kiosk-windows.zip`, and attaches it to GitHub Releases on `v*` tags.
+
 ## [0.4.1] - 2026-09-15
 
 - `kiosk-shell.bat` now self-elevates (UAC) and defaults to the offline

@@ -16,6 +16,7 @@ tests/test_kiosk_launcher.py
 tests/test_gui.py       # QTest behavior tests (clicks, dialogs, live reload)
 apps.json              # app search templates (editable, copyable, TRACKED in git)
 Kiosk.spec             # PyInstaller spec: windowed build, bundles apps.json
+.github/workflows/build.yml  # CI: run tests + build Kiosk-windows.zip
 kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
 kiosk-shell.bat        # Windows: enable/disable the registry kiosk shell (Plan B)
 diagnose-windows.ps1   # Windows: machine-level diagnostic (VC++ runtime, Qt plugin, event log)
