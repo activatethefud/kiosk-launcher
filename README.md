@@ -134,12 +134,19 @@ launcher in its Startup folder, and lock policies down with
 [Policy Plus](https://github.com/Fleex255/PolicyPlus) or Group Policy.
 
 ### B. Replace explorer.exe (true kiosk shell — works on Home + Pro)
-1. Freeze to a single `.exe`:
-   ```bash
-   pip install pyinstaller
-   pyinstaller --onefile --windowed --name Kiosk kiosk_launcher.py
+1. Install the build dependencies and freeze to an `.exe` — do this **on
+   Windows** (PyInstaller cannot cross-compile). Only two pip packages are
+   needed: `pyinstaller` (the bundler) and `pyside6-essentials` (the only
+   runtime dependency; everything else is the Python standard library):
+   ```powershell
+   pip install pyinstaller pyside6-essentials
+   pyinstaller --noconfirm --clean --onedir --windowed --name Kiosk kiosk_launcher.py
    ```
-2. Copy `Kiosk.exe` (and optionally a customized `apps.json`) to `C:\Kiosk\`.
+   - `--onedir` = folder build (faster startup; recommended for kiosks)
+   - `--windowed` = no console window (required for shell use)
+   - Output: `dist\Kiosk\Kiosk.exe`
+2. Copy the whole `dist\Kiosk\` folder (and optionally a customized
+   `apps.json`) to `C:\Kiosk\`.
 3. Set the shell **for the Student account only** (keeps an admin escape
    hatch — do NOT set the HKLM value or you can lock yourself out):
    ```
