@@ -38,9 +38,13 @@ more apps by regex.
 ```
 kiosk_launcher.py           # the entire application (single file)
 apps.json                   # app search templates (editable, copyable)
+Kiosk.spec                  # PyInstaller spec (windowed build, bundles apps.json)
+kiosk-watchdog.bat          # Windows: relaunch the launcher on crash
 tests/test_kiosk_launcher.py
+tests/test_gui.py           # QTest behavior tests (clicks, dialogs, live reload)
 AGENT.md                    # guidance for AI coding agents
 README.md
+.gitattributes              # CRLF line endings for *.bat
 kiosk_config.json           # runtime-generated settings + password, not committed
 ```
 
@@ -127,60 +131,94 @@ There are no runtime dependencies beyond PySide6, and the core (discovery,
 config, password) is stdlib-only so `--scan`/`--set-password` work without
 it. See [AGENT.md](AGENT.md) for architecture details and coding conventions.
 
-## Deploy on Windows (as a custom shell)
+## Deploy on Windows
 
-Two options:
+The launcher ships as a folder (`dist\Kiosk\`) containing `Kiosk.exe` and its
+runtime. Two deployment modes are supported; pick one per lab.
 
-### A. Run on top of Windows (simplest)
-Create a standard (non-admin) `Student` account, put a shortcut to the
-launcher in its Startup folder, and lock policies down with
-[Policy Plus](https://github.com/Fleex255/PolicyPlus) or Group Policy.
+### 1. Build once (on any Windows machine or VM)
 
-### B. Replace explorer.exe (true kiosk shell — works on Home + Pro)
-1. Install the build dependencies and freeze to an `.exe` — do this **on
-   Windows** (PyInstaller cannot cross-compile). Only two pip packages are
-   needed: `pyinstaller` (the bundler) and `pyside6-essentials` (the only
-   runtime dependency; everything else is the Python standard library):
-   ```powershell
-   pip install pyinstaller pyside6-essentials
-   pyinstaller --noconfirm --clean Kiosk.spec
-   ```
-   - `Kiosk.spec` bundles `apps.json`, keeps the build windowed, and enables
-     PyInstaller's own crash dialog as a fallback.
-   - Output: `dist\Kiosk\Kiosk.exe`
-2. Copy the whole `dist\Kiosk\` folder to `C:\Kiosk\`. Drop a customized
-   `apps.json` next to `Kiosk.exe` if you want your own app list.
+PyInstaller cannot cross-compile, so build on Windows:
 
-### If the exe shows nothing
+```powershell
+pip install pyinstaller pyside6-essentials
+pyinstaller --noconfirm --clean Kiosk.spec
+```
 
-Errors in a windowed build go to stderr, which is invisible. The launcher now
-**writes every fatal error to `kiosk-error.log` next to the exe** and pops a
-message box on Windows. To see errors live, build a console version:
+- `Kiosk.spec` bundles `apps.json`, keeps the build windowed, and enables
+  PyInstaller's own crash dialog as a fallback.
+- Output: `dist\Kiosk\Kiosk.exe`
 
-    pyinstaller --noconfirm --clean --onedir --console --name KioskDebug kiosk_launcher.py
-    .\dist\KioskDebug\KioskDebug.exe
+### 2. Client install (repeat on every lab machine)
 
-or run the existing exe from a terminal:
+Common to both modes:
 
-    .\dist\Kiosk\Kiosk.exe
-3. Set the shell **for the Student account only** (keeps an admin escape
-   hatch — do NOT set the HKLM value or you can lock yourself out):
-   ```
-   reg add "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" ^
-       /v Shell /t REG_SZ /d "C:\Kiosk\Kiosk.exe" /f
-   ```
-   Run that *as the Student user* (or under HKCU while logged in as them).
-4. Also disable Task Manager for the student, otherwise
-   Ctrl+Alt+Del → Task Manager → *Run new task* → `explorer.exe` defeats it:
-   ```
-   reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" ^
-       /v DisableTaskMgr /t REG_DWORD /d 1 /f
-   ```
-5. Keep an `Admin` account with the normal explorer shell to manage the
-   machine and undo changes.
+1. Create two local accounts:
+   - **Admin** — administrator, normal desktop (your escape hatch).
+   - **Student** — *standard* (non-admin) user.
+2. Copy the whole `dist\Kiosk\` folder to `C:\Kiosk\`. Drop your customized
+   `apps.json` next to `Kiosk.exe` if you have one.
+3. Log in as Student and confirm the launcher finds the installed apps:
+   `C:\Kiosk\Kiosk.exe --scan` (or use **Admin → Rescan**). Then change the
+   admin password via **Admin → Change password…** (the windowed exe has no
+   console, so use the GUI rather than `--set-password`).
+
+Then choose one mode:
+
+#### Mode A — autostart on top of Windows (lower risk, easy to revert)
+
+- Put a shortcut in the Student's Startup folder (`shell:startup`) with target
+  `C:\Kiosk\kiosk-watchdog.bat --kiosk`.
+- Lock policies with [Policy Plus](https://github.com/Fleex255/PolicyPlus)
+  (Home) or `gpedit.msc` (Pro): disable Task Manager, Win+X, Alt+Tab, etc.
+
+#### Mode B — replace explorer.exe (true kiosk shell, works on Home + Pro)
+
+Run these **as the Student user** (or under their HKCU):
+
+```bat
+reg add "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" ^
+    /v Shell /t REG_SZ /d "C:\Kiosk\Kiosk.exe" /f
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" ^
+    /v DisableTaskMgr /t REG_DWORD /d 1 /f
+```
+
+> Do **not** set the HKLM `Shell` value or you can lock yourself out. Keep the
+> Admin account on the normal explorer shell. Recovery from the Admin account:
+>
+> ```bat
+> reg load HKU\Student C:\Users\Student\NTUSER.DAT
+> reg add "HKU\Student\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f
+> reg unload HKU\Student
+> ```
+
+#### Verify on each client
+
+- [ ] Launcher starts fullscreen and app cards appear
+- [ ] `Alt+Tab`, Win key, `Ctrl+Esc`, and `Alt+F4` prompt for the password
+- [ ] Task Manager is disabled (Ctrl+Alt+Del has no Task Manager)
+- [ ] Editing `apps.json` shows up without restarting (live reload)
+- [ ] Admin → Exit (password) stops the watchdog (Mode A)
 
 > **Always test in a VM or on a spare machine first**, and keep an admin
 > account with a normal desktop.
+
+### 3. If the exe shows nothing
+
+Errors in a windowed build go to stderr, which is invisible. The launcher
+**writes every fatal error to `kiosk-error.log` next to the exe** and pops a
+message box on Windows. To see errors live, build a console version:
+
+```powershell
+pyinstaller --noconfirm --clean --onedir --console --name KioskDebug kiosk_launcher.py
+.\dist\KioskDebug\KioskDebug.exe
+```
+
+or run the existing exe from a terminal:
+
+```powershell
+.\dist\Kiosk\Kiosk.exe
+```
 
 ### Hotkey lockdown (kiosk mode)
 
@@ -203,15 +241,31 @@ can switch keyboard layouts; everything else listed above is blocked.
 
 ### Watchdog (auto-relaunch on crash)
 
-`kiosk-watchdog.bat` keeps the launcher alive: if `Kiosk.exe` crashes or is
-killed (non-zero exit), it relaunches after 2 seconds. It stops when you exit
-cleanly via the admin menu (password → Exit, exit code 0) or when a
-`stop.kiosk` marker file exists next to it.
+`kiosk-watchdog.bat` supervises the launcher in a loop:
 
-To start it with the student's session, drop a shortcut in the Startup folder
-(`shell:startup`) pointing at the script with `--kiosk` in the target:
+```text
+:loop
+   if stop.kiosk exists → delete it, stop
+   run Kiosk.exe %*
+   if exit code == 0  → stop          (admin exited via password)
+   else              → wait 2 s → loop again
+```
 
-    C:\Kiosk\kiosk-watchdog.bat --kiosk
+| Kiosk.exe exit | Watchdog action |
+|---|---|
+| `0` — admin menu → Exit (password) | **stop** (so you can get back in) |
+| non-zero — crash or `taskkill /f` | wait 2 s, **relaunch** |
+| `stop.kiosk` marker file present | delete the marker, **stop** |
+
+Notes:
+
+- It expects `Kiosk.exe` **next to the script** (`%~dp0Kiosk.exe`).
+- It's for **Mode A**: drop a shortcut in `shell:startup` pointing at
+  `C:\Kiosk\kiosk-watchdog.bat --kiosk`.
+- It **can't be the shell itself** — the registry `Shell` value must be an
+  `.exe`, so Mode B runs `Kiosk.exe` directly.
+- Three commented-out `reg add` lines (DisableTaskMgr / DisableLockWorkstation
+  / DisableChangePassword) harden the Ctrl+Alt+Del screen if un-commented.
 
 ## Config reference (`kiosk_config.json`)
 
