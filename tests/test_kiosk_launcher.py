@@ -522,6 +522,44 @@ class TestSetPassword(unittest.TestCase):
         self.assertNotEqual(old_salt, cfg["password"]["salt"])
 
 
+class TestErrorReportingAndBundling(unittest.TestCase):
+    def test_fatal_error_writes_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(k, "_base_dir", return_value=tmp), \
+                 mock.patch("sys.stderr"):
+                k.fatal_error("boom failure")
+            log = os.path.join(tmp, "kiosk-error.log")
+            self.assertTrue(os.path.exists(log))
+            with open(log, encoding="utf-8") as f:
+                self.assertIn("boom failure", f.read())
+
+    def test_bundled_apps_path_none_when_not_frozen(self):
+        with mock.patch.object(sys, "frozen", False, create=True):
+            self.assertIsNone(k._bundled_apps_path())
+
+    def test_bundled_apps_path_finds_meipass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "apps.json"), "w", encoding="utf-8") as f:
+                f.write("[]")
+            with mock.patch.object(sys, "frozen", True, create=True), \
+                 mock.patch.object(sys, "_MEIPASS", tmp, create=True):
+                self.assertEqual(
+                    k._bundled_apps_path(), os.path.join(tmp, "apps.json")
+                )
+
+    def test_load_apps_copies_bundled_when_frozen(self):
+        with tempfile.TemporaryDirectory() as bundle, \
+             tempfile.TemporaryDirectory() as exedir:
+            bundled = os.path.join(bundle, "apps.json")
+            k.save_apps([{"name": "Bundled", "patterns": ["b$"], "args": []}], bundled)
+            target = os.path.join(exedir, "apps.json")
+            with mock.patch.object(sys, "frozen", True, create=True), \
+                 mock.patch.object(sys, "_MEIPASS", bundle, create=True):
+                apps, _ = k.load_apps(target)
+            self.assertEqual([a["name"] for a in apps], ["Bundled"])
+            self.assertTrue(os.path.exists(target))  # copied next to the exe
+
+
 class TestWalkDepth(unittest.TestCase):
     def test_respects_max_depth(self):
         with tempfile.TemporaryDirectory() as tmp:

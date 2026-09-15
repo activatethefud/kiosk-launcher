@@ -143,13 +143,26 @@ launcher in its Startup folder, and lock policies down with
    runtime dependency; everything else is the Python standard library):
    ```powershell
    pip install pyinstaller pyside6-essentials
-   pyinstaller --noconfirm --clean --onedir --windowed --name Kiosk kiosk_launcher.py
+   pyinstaller --noconfirm --clean Kiosk.spec
    ```
-   - `--onedir` = folder build (faster startup; recommended for kiosks)
-   - `--windowed` = no console window (required for shell use)
+   - `Kiosk.spec` bundles `apps.json`, keeps the build windowed, and enables
+     PyInstaller's own crash dialog as a fallback.
    - Output: `dist\Kiosk\Kiosk.exe`
-2. Copy the whole `dist\Kiosk\` folder (and optionally a customized
-   `apps.json`) to `C:\Kiosk\`.
+2. Copy the whole `dist\Kiosk\` folder to `C:\Kiosk\`. Drop a customized
+   `apps.json` next to `Kiosk.exe` if you want your own app list.
+
+### If the exe shows nothing
+
+Errors in a windowed build go to stderr, which is invisible. The launcher now
+**writes every fatal error to `kiosk-error.log` next to the exe** and pops a
+message box on Windows. To see errors live, build a console version:
+
+    pyinstaller --noconfirm --clean --onedir --console --name KioskDebug kiosk_launcher.py
+    .\dist\KioskDebug\KioskDebug.exe
+
+or run the existing exe from a terminal:
+
+    .\dist\Kiosk\Kiosk.exe
 3. Set the shell **for the Student account only** (keeps an admin escape
    hatch — do NOT set the HKLM value or you can lock yourself out):
    ```

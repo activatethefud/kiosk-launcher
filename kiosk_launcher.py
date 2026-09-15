@@ -41,6 +41,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
+import traceback
 
 APP_NAME = "Kiosk Launcher"
 VERSION = "0.2.0"
@@ -444,6 +446,43 @@ def default_apps_path():
     return os.path.join(_base_dir(), "apps.json")
 
 
+def error_log_path():
+    return os.path.join(_base_dir(), "kiosk-error.log")
+
+
+def fatal_error(message):
+    """Report a fatal error visibly and to a log file next to the exe.
+
+    In a windowed (console=False) build stderr is discarded, so we also show a
+    native message box on Windows and always append to kiosk-error.log.
+    """
+    try:
+        with open(error_log_path(), "a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] FATAL: {message}\n")
+    except OSError:
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW.argtypes = [
+                ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint,
+            ]
+            ctypes.windll.user32.MessageBoxW.restype = ctypes.c_int
+            ctypes.windll.user32.MessageBoxW(
+                0, str(message), "Kiosk Launcher - Fatal Error", 0x10  # MB_ICONERROR
+            )
+        except Exception:
+            pass
+    print(f"FATAL: {message}", file=sys.stderr)
+
+
+def _install_excepthook():
+    """Route unhandled exceptions (incl. Qt slot callbacks) to the log file."""
+    def hook(exc_type, exc_value, exc_tb):
+        fatal_error("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+    sys.excepthook = hook
+
+
 def seed_config():
     salt, digest, iterations = hash_password(DEFAULT_PASSWORD)
     return {
@@ -509,12 +548,31 @@ def normalize_app(entry):
     return {"name": name.strip(), "patterns": patterns, "args": args}
 
 
+def _bundled_apps_path():
+    """Path to apps.json bundled inside the frozen exe (if present)."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        p = os.path.join(sys._MEIPASS, "apps.json")
+        if os.path.exists(p):
+            return p
+    return None
+
+
 def load_apps(path):
     """Load app search templates. Seeds apps.json from presets if absent.
+
+    When frozen and no apps.json sits next to the exe, a bundled copy is
+    copied there first (so the user can still edit it).
 
     Returns (apps, path). If the file exists but is invalid, the built-in
     presets are used in memory (the file is NOT overwritten).
     """
+    if not os.path.exists(path):
+        bundled = _bundled_apps_path()
+        if bundled:
+            try:
+                shutil.copyfile(bundled, path)
+            except OSError:
+                pass
     apps = None
     if os.path.exists(path):
         try:
@@ -1356,34 +1414,40 @@ if _HAS_QT:
 
 
 def run_gui(args):
+    _install_excepthook()
     if not _HAS_QT:
-        sys.exit(GUI_IMPORT_ERROR)
+        fatal_error(GUI_IMPORT_ERROR)
+        sys.exit(1)
 
-    cfg, path = load_config(args.config or default_config_path())
-    apps, apps_path = load_apps(args.apps or default_apps_path())
-    kiosk = args.kiosk or (cfg.get("fullscreen", False) and not args.windowed)
+    try:
+        cfg, path = load_config(args.config or default_config_path())
+        apps, apps_path = load_apps(args.apps or default_apps_path())
+        kiosk = args.kiosk or (cfg.get("fullscreen", False) and not args.windowed)
 
-    app = QApplication(sys.argv)
-    win = MainWindow(cfg, path, apps, apps_path, kiosk)
-    if os.name == "nt" and win.kiosk:
-        class HotkeyBridge(QObject):
-            hotkeyBlocked = Signal()
+        app = QApplication(sys.argv)
+        win = MainWindow(cfg, path, apps, apps_path, kiosk)
+        if os.name == "nt" and win.kiosk:
+            class HotkeyBridge(QObject):
+                hotkeyBlocked = Signal()
 
-            def notify(self):
-                self.hotkeyBlocked.emit()
+                def notify(self):
+                    self.hotkeyBlocked.emit()
 
-        bridge = HotkeyBridge()
-        bridge.hotkeyBlocked.connect(win.on_admin)
-        blocker = KioskHotkeyBlocker(bridge.notify)
-        blocker.start()
-        win._kiosk_hotkey_blocker = blocker
-        app.aboutToQuit.connect(blocker.stop)
-    if getattr(args, "smoke", False):
-        QTimer.singleShot(600, app.quit)
-    if win.kiosk:
-        win.showFullScreen()
-    else:
-        win.show()
+            bridge = HotkeyBridge()
+            bridge.hotkeyBlocked.connect(win.on_admin)
+            blocker = KioskHotkeyBlocker(bridge.notify)
+            blocker.start()
+            win._kiosk_hotkey_blocker = blocker
+            app.aboutToQuit.connect(blocker.stop)
+        if getattr(args, "smoke", False):
+            QTimer.singleShot(600, app.quit)
+        if win.kiosk:
+            win.showFullScreen()
+        else:
+            win.show()
+    except Exception:
+        fatal_error(traceback.format_exc())
+        sys.exit(1)
     sys.exit(app.exec())
 
 

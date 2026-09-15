@@ -15,6 +15,7 @@ kiosk_launcher.py      # the entire application
 tests/test_kiosk_launcher.py
 tests/test_gui.py       # QTest behavior tests (clicks, dialogs, live reload)
 apps.json              # app search templates (editable, copyable, TRACKED in git)
+Kiosk.spec             # PyInstaller spec: windowed build, bundles apps.json
 kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
 README.md              # user-facing docs + Windows shell deployment recipe
 AGENT.md               # this file
@@ -98,6 +99,14 @@ Top-level functions (module `kiosk_launcher`):
   `MainWindow(cfg, cfg_path, apps, apps_path, kiosk)` is constructed explicitly
   (no closure variables). Widgets expose `objectName`s (e.g. `app:<name>`,
   `addapp_name`, `removeapp_list`) for deterministic lookup in tests.
+- `fatal_error(message)` / `error_log_path()` / `_install_excepthook()` —
+  errors in a windowed build are invisible (stderr is discarded), so fatal
+  errors are appended to `kiosk-error.log` next to the exe and shown in a
+  Windows message box; `sys.excepthook` is replaced so Qt slot exceptions are
+  logged too. `run_gui` wraps setup in try/except and calls `fatal_error`.
+- `_bundled_apps_path()` / `load_apps(path)` — when frozen, a bundled
+  `apps.json` (from `sys._MEIPASS`) is copied next to the exe if none exists,
+  so a user-edited `apps.json` always wins over the bundled default.
 - `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
   password prompts, and close/keyboard handling. Admin add/remove app edits
   the in-memory app list and calls `save_apps`. A `QFileSystemWatcher` +
