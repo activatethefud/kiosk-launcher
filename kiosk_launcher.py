@@ -887,38 +887,40 @@ def cmd_set_password(args):
 # ==========================================================================
 # GUI
 # ==========================================================================
-def run_gui(args):
-    try:
-        from PySide6.QtCore import Qt, QPoint, QTimer, QFileSystemWatcher, QObject, Signal
-        from PySide6.QtWidgets import (
-            QApplication,
-            QDialog,
-            QDialogButtonBox,
-            QFormLayout,
-            QGridLayout,
-            QInputDialog,
-            QLineEdit,
-            QListWidget,
-            QListWidgetItem,
-            QAbstractItemView,
-            QMenu,
-            QMessageBox,
-            QPlainTextEdit,
-            QPushButton,
-            QScrollArea,
-            QVBoxLayout,
-            QWidget,
-            QLabel,
-            QHBoxLayout,
-        )
-    except ImportError:
-        sys.exit(
-            "PySide6 is required for the GUI.\n"
-            "Install it with:  pip install pyside6  (or apt install python3-pyside6)"
-        )
+try:
+    from PySide6.QtCore import Qt, QPoint, QTimer, QFileSystemWatcher, QObject, Signal
+    from PySide6.QtWidgets import (
+        QApplication,
+        QDialog,
+        QDialogButtonBox,
+        QFormLayout,
+        QGridLayout,
+        QInputDialog,
+        QLineEdit,
+        QListWidget,
+        QListWidgetItem,
+        QAbstractItemView,
+        QMenu,
+        QMessageBox,
+        QPlainTextEdit,
+        QPushButton,
+        QScrollArea,
+        QVBoxLayout,
+        QWidget,
+        QLabel,
+        QHBoxLayout,
+    )
+    _HAS_QT = True
+except ImportError:
+    _HAS_QT = False
 
-    cfg, path = load_config(args.config or default_config_path())
-    apps, apps_path = load_apps(args.apps or default_apps_path())
+GUI_IMPORT_ERROR = (
+    "PySide6 is required for the GUI.\n"
+    "Install it with:  pip install pyside6  (or apt install python3-pyside6)"
+)
+
+
+if _HAS_QT:
 
     class AddAppDialog(QDialog):
         def __init__(self, parent=None):
@@ -927,14 +929,17 @@ def run_gui(args):
             self.setMinimumWidth(420)
             form = QFormLayout(self)
             self.name_edit = QLineEdit()
+            self.name_edit.setObjectName("addapp_name")
             self.name_edit.setPlaceholderText("e.g. GIMP")
             self.patterns_edit = QPlainTextEdit()
+            self.patterns_edit.setObjectName("addapp_patterns")
             self.patterns_edit.setPlaceholderText(
                 "One regex per line, matched against the exe path, e.g.\n"
                 "gimp(?:\\.exe)?$\n"
                 "firefox(?:\\.exe)?$"
             )
             self.args_edit = QLineEdit()
+            self.args_edit.setObjectName("addapp_args")
             self.args_edit.setPlaceholderText("optional arguments")
             form.addRow("Name:", self.name_edit)
             form.addRow("Match (regex):", self.patterns_edit)
@@ -986,6 +991,7 @@ def run_gui(args):
             layout = QVBoxLayout(self)
             layout.addWidget(QLabel("Select apps to remove:"))
             self.list_widget = QListWidget()
+            self.list_widget.setObjectName("removeapp_list")
             self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
             for a in apps:
                 item = QListWidgetItem(a["name"])
@@ -1007,19 +1013,20 @@ def run_gui(args):
             ]
 
     class MainWindow(QWidget):
-        def __init__(self):
+        def __init__(self, cfg, cfg_path, apps, apps_path, kiosk):
             super().__init__()
             self.cfg = cfg
-            self.cfg_path = path
+            self.cfg_path = cfg_path
             self.apps = apps
             self.apps_path = apps_path
-            self.kiosk = args.kiosk or (cfg.get("fullscreen", False) and not args.windowed)
+            self.kiosk = kiosk
             self.setWindowTitle(APP_NAME)
 
             root = QVBoxLayout(self)
             root.setContentsMargins(18, 18, 18, 12)
 
             self.status_label = QLabel("")
+            self.status_label.setObjectName("status_label")
             self.status_label.setStyleSheet("color: #a6adc8; font-size: 14px;")
 
             scroll = QScrollArea()
@@ -1032,6 +1039,7 @@ def run_gui(args):
             scroll.setWidget(self.grid_host)
 
             self.admin_btn = QPushButton("\u2699  Admin")
+            self.admin_btn.setObjectName("admin_btn")
             self.admin_btn.setStyleSheet(
                 "QPushButton { background: #313244; color: #cdd6f4; border-radius: 8px;"
                 " padding: 8px 16px; font-size: 14px; }"
@@ -1106,6 +1114,7 @@ def run_gui(args):
                 icon = EMOJI.get(key, DEFAULT_EMOJI)
                 btn = QPushButton(f"{icon}\n{a['name']}")
                 btn.setProperty("class", "app")
+                btn.setObjectName("app:" + a["name"])
                 btn.setFixedSize(180, 130)
                 btn.setToolTip(a["path"])
                 btn.clicked.connect(lambda _=False, a=a: self.launch(a))
@@ -1223,8 +1232,17 @@ def run_gui(args):
                 return
             super().keyPressEvent(event)
 
+
+def run_gui(args):
+    if not _HAS_QT:
+        sys.exit(GUI_IMPORT_ERROR)
+
+    cfg, path = load_config(args.config or default_config_path())
+    apps, apps_path = load_apps(args.apps or default_apps_path())
+    kiosk = args.kiosk or (cfg.get("fullscreen", False) and not args.windowed)
+
     app = QApplication(sys.argv)
-    win = MainWindow()
+    win = MainWindow(cfg, path, apps, apps_path, kiosk)
     if os.name == "nt" and win.kiosk:
         class HotkeyBridge(QObject):
             hotkeyBlocked = Signal()

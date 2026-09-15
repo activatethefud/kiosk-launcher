@@ -13,6 +13,7 @@ File layout:
 ```
 kiosk_launcher.py      # the entire application
 tests/test_kiosk_launcher.py
+tests/test_gui.py       # QTest behavior tests (clicks, dialogs, live reload)
 apps.json              # app search templates (editable, copyable, TRACKED in git)
 kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
 README.md              # user-facing docs + Windows shell deployment recipe
@@ -34,6 +35,9 @@ python3 kiosk_launcher.py --apps PATH        # use a specific apps.json
 
 # tests (stdlib unittest; also runnable with pytest)
 python3 -m unittest discover -s tests -v
+
+# GUI tests drive real widgets/dialogs offscreen (QT_QPA_PLATFORM=offscreen)
+python3 -m unittest tests.test_gui -v
 
 # compile check
 python3 -m py_compile kiosk_launcher.py
@@ -89,10 +93,17 @@ Top-level functions (module `kiosk_launcher`):
   calls a callback (which emits a Qt signal → password prompt) for each blocked
   combo. Ctrl+Alt+Del is flagged but Windows delivers the SAS to winlogon, not
   the hook — disable Task Manager/lock/change-password via policy instead.
+- `AddAppDialog` / `RemoveAppDialog` / `MainWindow` (module-level, defined only
+  when `_HAS_QT` is True) — importable for GUI tests.
+  `MainWindow(cfg, cfg_path, apps, apps_path, kiosk)` is constructed explicitly
+  (no closure variables). Widgets expose `objectName`s (e.g. `app:<name>`,
+  `addapp_name`, `removeapp_list`) for deterministic lookup in tests.
 - `run_gui(args)` — PySide6 UI. `MainWindow` holds the grid, admin menu,
   password prompts, and close/keyboard handling. Admin add/remove app edits
   the in-memory app list and calls `save_apps`. A `QFileSystemWatcher` +
-  debounced `QTimer` live-reloads `apps.json` when it changes on disk.
+  debounced `QTimer` live-reloads `apps.json` when it changes on disk. `run_gui`
+  builds `QApplication` + `MainWindow`, starts the Windows hotkey blocker in
+  kiosk mode, and runs the event loop.
 - CLI modes: `cmd_scan(args)`, `cmd_set_password(args)`.
 
 ### Discovery (the important part)
@@ -119,6 +130,10 @@ Top-level functions (module `kiosk_launcher`):
   `apps.json`) with filename-anchored regexes.
 - Tests: prefer `mock.patch.object(kiosk_launcher, "gather_candidates", ...)`
   for discovery tests so they are deterministic and machine-independent.
+- GUI tests live in `tests/test_gui.py`: create a `MainWindow` directly, drive
+  modal dialogs/popups with `QTimer.singleShot` + helpers that type into the
+  active modal and click OK, and use `QTest` for clicks/keys. They run under
+  the offscreen platform (set at the top of the file).
 - New behavior should come with a test in `tests/test_kiosk_launcher.py`.
 
 ## Deployment notes (Windows custom shell)
