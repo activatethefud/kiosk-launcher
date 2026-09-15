@@ -4,6 +4,7 @@
     # or: pytest tests/
 """
 
+import io
 import json
 import os
 import re
@@ -48,6 +49,13 @@ class TestPassword(unittest.TestCase):
         self.assertFalse(k.verify_password("x", {}))
         self.assertFalse(k.verify_password("x", {"salt": "nothex", "hash": "h"}))
         self.assertFalse(k.verify_password(None, {"salt": "00", "hash": "00"}))
+
+    def test_custom_iterations_roundtrip(self):
+        salt, digest, it = k.hash_password("pw", iterations=1000)
+        self.assertEqual(it, 1000)
+        self.assertTrue(
+            k.verify_password("pw", {"salt": salt, "hash": digest, "iterations": 1000})
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +229,17 @@ class TestAppTemplates(unittest.TestCase):
     def test_normalize_app_rejects_missing_patterns(self):
         self.assertIsNone(k.normalize_app({"name": "X", "args": []}))
 
+    def test_normalize_app_coerces_nonlist_args(self):
+        app = k.normalize_app({"name": "X", "patterns": ["x$"], "args": 123})
+        self.assertEqual(app["args"], [])
+
+    def test_normalize_app_filters_nonstring_patterns(self):
+        app = k.normalize_app({"name": "X", "patterns": [123, "x$", None], "args": []})
+        self.assertEqual(app["patterns"], ["x$"])
+
+    def test_normalize_app_rejects_nonstring_name(self):
+        self.assertIsNone(k.normalize_app({"name": 123, "patterns": ["x$"], "args": []}))
+
 
 # ---------------------------------------------------------------------------
 # Discovery
@@ -302,6 +321,13 @@ class TestDiscovery(unittest.TestCase):
         with mock.patch.object(k, "gather_candidates", return_value={"/x/a"}):
             found, missing = k.discover_apps(apps)
         self.assertEqual(found[0]["args"], ["--flag", "--two"])
+        self.assertEqual(missing, [])
+
+    def test_discover_apps_coerces_string_patterns(self):
+        apps = [{"name": "A", "patterns": "a$", "args": []}]
+        with mock.patch.object(k, "gather_candidates", return_value={"/x/a"}):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(len(found), 1)
         self.assertEqual(missing, [])
 
     def test_gather_candidates_includes_path_entries(self):
@@ -593,6 +619,15 @@ class TestAddRemoveApps(unittest.TestCase):
         self.assertEqual(removed, 0)
         self.assertEqual(len(apps), 1)
 
+    def test_remove_apps_ignores_nonstring_names(self):
+        apps = [
+            {"name": "A", "patterns": ["a$"], "args": []},
+            {"name": "B", "patterns": ["b$"], "args": []},
+        ]
+        removed = k.remove_apps(apps, [123, "A"])
+        self.assertEqual(removed, 1)
+        self.assertEqual([a["name"] for a in apps], ["B"])
+
 
 class TestSetPassword(unittest.TestCase):
     def test_set_password_updates_and_verifies(self):
@@ -715,6 +750,52 @@ class TestCliAndBuild(unittest.TestCase):
         self.assertIn("console=False", spec)
         self.assertIn("upx=False", spec)
 
+    def test_cmd_scan_prints_results(self):
+        args = k.argparse.Namespace(config="/tmp/c.json", apps="/tmp/a.json")
+        with mock.patch.object(k, "load_config", return_value=({}, "/tmp/c.json")), \
+             mock.patch.object(
+                 k, "load_apps",
+                 return_value=([{"name": "Alpha", "patterns": ["a$"], "args": []}], "/tmp/a.json"),
+             ), \
+             mock.patch.object(
+                 k, "discover_apps",
+                 return_value=([{"name": "Alpha", "path": "/x/alpha", "args": []}], ["Beta"]),
+             ):
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                k.cmd_scan(args)
+        text = out.getvalue()
+        self.assertIn("Alpha", text)
+        self.assertIn("/x/alpha", text)
+        self.assertIn("Beta", text)
+
+
+class TestDesktopExecPaths(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "POSIX-only")
+    def test_parses_exec_field(self):
+        with tempfile.TemporaryDirectory() as d:
+            bin_dir = os.path.join(d, "bin")
+            os.makedirs(bin_dir)
+            absolute = os.path.join(bin_dir, "myapp")
+            rel_bin = os.path.join(bin_dir, "relapp")
+            for p in (absolute, rel_bin):
+                with open(p, "w"):
+                    pass
+            os.chmod(rel_bin, 0o755)  # shutil.which requires executable
+
+            desktop = os.path.join(d, "apps")
+            os.makedirs(desktop)
+            with open(os.path.join(desktop, "a.desktop"), "w", encoding="utf-8") as f:
+                f.write("[Desktop Entry]\nExec=%s --flag %%U\n" % absolute)
+            with open(os.path.join(desktop, "b.desktop"), "w", encoding="utf-8") as f:
+                f.write("[Desktop Entry]\nExec=relapp %%f\n")
+            with open(os.path.join(desktop, "c.desktop"), "w", encoding="utf-8") as f:
+                f.write("[Desktop Entry]\nExec=env VAR=x %s\n" % absolute)
+
+            with mock.patch.dict(os.environ, {"PATH": bin_dir}):
+                got = k._desktop_exec_paths(dirs=[desktop])
+            self.assertIn(absolute, got)
+            self.assertIn(rel_bin, got)
+
 
 class TestWalkDepth(unittest.TestCase):
     def test_respects_max_depth(self):
@@ -730,6 +811,28 @@ class TestWalkDepth(unittest.TestCase):
             self.assertIn(l0, got)
             self.assertIn(l1, got)
             self.assertNotIn(l3, got)
+
+    def test_ext_filter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "a.exe"), "w"):
+                pass
+            with open(os.path.join(tmp, "a.txt"), "w"):
+                pass
+            got = set(k._walk_depth(tmp, max_depth=1, exts=(".exe",)))
+            self.assertIn(os.path.join(tmp, "a.exe"), got)
+            self.assertNotIn(os.path.join(tmp, "a.txt"), got)
+
+    def test_depth_zero_only_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "sub"))
+            root_file = os.path.join(tmp, "root.txt")
+            sub_file = os.path.join(tmp, "sub", "sub.txt")
+            for p in (root_file, sub_file):
+                with open(p, "w"):
+                    pass
+            got = set(k._walk_depth(tmp, max_depth=0))
+            self.assertIn(root_file, got)
+            self.assertNotIn(sub_file, got)
 
 
 # ---------------------------------------------------------------------------

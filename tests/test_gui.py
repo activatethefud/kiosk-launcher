@@ -270,6 +270,68 @@ class TestAdminFlow(GuiTestBase):
         self.assertTrue(k.verify_password("newpass", win.cfg["password"]))
         self.assertFalse(k.verify_password("old", win.cfg["password"]))
 
+    def test_add_app_invalid_regex_shows_warning(self):
+        win, *_ = self.make_window(password="secret")
+        warnings = []
+
+        def fill_bad():
+            dlg = _active_modal()
+            dlg.findChild(QLineEdit, "addapp_name").setText("Gamma")
+            dlg.findChild(QPlainTextEdit, "addapp_patterns").setPlainText("(unclosed")
+            _click_ok(dlg)
+
+        def dismiss_warning():
+            w = _active_modal()
+            if isinstance(w, QMessageBox):
+                warnings.append(w)
+                w.accept()
+
+        def reject_dialog():
+            dlg = _active_modal()
+            if dlg is not None:
+                dlg.reject()
+
+        QTimer.singleShot(100, lambda: _fill_input("secret"))
+        QTimer.singleShot(300, lambda: _trigger_menu("Add app"))
+        QTimer.singleShot(600, fill_bad)
+        QTimer.singleShot(900, dismiss_warning)
+        QTimer.singleShot(1100, reject_dialog)
+        win.on_admin()
+
+        self.assertEqual(len(warnings), 1)
+        self.assertNotIn("Gamma", [a["name"] for a in win.apps])
+
+    def test_add_app_empty_name_shows_warning(self):
+        win, *_ = self.make_window(password="secret")
+        warnings = []
+
+        def fill_empty():
+            dlg = _active_modal()
+            dlg.findChild(QLineEdit, "addapp_name").setText("")
+            dlg.findChild(QPlainTextEdit, "addapp_patterns").setPlainText("gamma$")
+            _click_ok(dlg)
+
+        def dismiss_warning():
+            w = _active_modal()
+            if isinstance(w, QMessageBox):
+                warnings.append(w)
+                w.accept()
+
+        def reject_dialog():
+            dlg = _active_modal()
+            if dlg is not None:
+                dlg.reject()
+
+        QTimer.singleShot(100, lambda: _fill_input("secret"))
+        QTimer.singleShot(300, lambda: _trigger_menu("Add app"))
+        QTimer.singleShot(600, fill_empty)
+        QTimer.singleShot(900, dismiss_warning)
+        QTimer.singleShot(1100, reject_dialog)
+        win.on_admin()
+
+        self.assertEqual(len(warnings), 1)
+        self.assertNotIn("Gamma", [a["name"] for a in win.apps])
+
 
 # ---------------------------------------------------------------------------
 # Kiosk-mode behavior
@@ -315,6 +377,15 @@ class TestKioskBehavior(GuiTestBase):
             QTest.qWait(900)  # debounce (400ms) + reload + rebuild
             self.assertEqual(len(win.apps), 3)
             self.assertEqual(len(self._app_buttons(win)), 3)
+
+    def test_reload_with_broken_apps_falls_back_to_presets(self):
+        with mock.patch.object(k, "discover_apps", return_value=([], [])):
+            win, cfg, cfg_path, apps_path, apps = self.make_window()
+        with open(apps_path, "w", encoding="utf-8") as f:
+            f.write("{ not valid json")
+        with mock.patch.object(k, "discover_apps", return_value=([], [])):
+            win._reload_apps()
+        self.assertEqual(win.apps, k.BUILTIN_APPS)
 
 
 class TestTextWrapping(GuiTestBase):

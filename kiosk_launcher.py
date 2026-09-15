@@ -777,16 +777,21 @@ def _registry_app_paths():
     return out
 
 
-def _desktop_exec_paths():
-    """Linux: extract binary paths from .desktop launchers."""
+def _desktop_exec_paths(dirs=None):
+    """Linux: extract binary paths from .desktop launchers.
+
+    dirs defaults to the standard desktop directories; pass a list to test or
+    override.
+    """
     if os.name == "nt":
         return set()
+    if dirs is None:
+        dirs = [
+            "/usr/share/applications",
+            "/usr/local/share/applications",
+            os.path.expanduser("~/.local/share/applications"),
+        ]
     out = set()
-    dirs = [
-        "/usr/share/applications",
-        "/usr/local/share/applications",
-        os.path.expanduser("~/.local/share/applications"),
-    ]
     for d in dirs:
         if not os.path.isdir(d):
             continue
@@ -907,6 +912,8 @@ def discover_apps(apps):
             continue
         name = app.get("name", "?")
         patterns = app.get("patterns", [])
+        if isinstance(patterns, str):
+            patterns = [patterns]
         if not isinstance(patterns, list) or not patterns:
             missing.append(str(name))
             continue
