@@ -1069,6 +1069,7 @@ def cmd_set_password(args):
 # ==========================================================================
 try:
     from PySide6.QtCore import Qt, QPoint, QTimer, QFileSystemWatcher, QObject, Signal
+    from PySide6.QtGui import QFont, QFontMetrics
     from PySide6.QtWidgets import (
         QApplication,
         QDialog,
@@ -1101,6 +1102,32 @@ GUI_IMPORT_ERROR = (
 
 
 if _HAS_QT:
+
+    def wrap_text(text, font, max_width):
+        """Wrap text with newlines so each line fits within max_width pixels."""
+        fm = QFontMetrics(font)
+        lines = []
+        current = ""
+        for word in text.split():
+            # Break a single overlong word into chunks that fit.
+            while len(word) > 1 and fm.horizontalAdvance(word) > max_width:
+                cut = 1
+                while cut < len(word) and fm.horizontalAdvance(word[: cut + 1]) <= max_width:
+                    cut += 1
+                if current:
+                    lines.append(current)
+                    current = ""
+                lines.append(word[:cut])
+                word = word[cut:]
+            candidate = f"{current} {word}".strip()
+            if fm.horizontalAdvance(candidate) <= max_width or not current:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return "\n".join(lines) if lines else text
 
     class AddAppDialog(QDialog):
         def __init__(self, parent=None):
@@ -1289,14 +1316,18 @@ if _HAS_QT:
                     w.deleteLater()
             found, missing = discover_apps(self.apps)
             cols = max(1, int(self.cfg.get("columns", 4)))
+            card_font = QFont()
+            card_font.setPixelSize(20)
+            card_font.setWeight(QFont.Weight.DemiBold)
             for i, a in enumerate(found):
                 key = a["name"].lower()
                 icon = EMOJI.get(key, DEFAULT_EMOJI)
-                btn = QPushButton(f"{icon}\n{a['name']}")
+                btn = QPushButton()
                 btn.setProperty("class", "app")
                 btn.setObjectName("app:" + a["name"])
                 btn.setFixedSize(180, 130)
                 btn.setToolTip(a["path"])
+                btn.setText(f"{icon}\n{wrap_text(a['name'], card_font, 130)}")
                 btn.clicked.connect(lambda _=False, a=a: self.launch(a))
                 self.grid.addWidget(btn, i // cols, i % cols)
             self.grid.setRowStretch((len(found) // cols) + 1, 1)

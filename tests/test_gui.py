@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import kiosk_launcher as k  # noqa: E402
 
 from PySide6.QtCore import Qt, QTimer  # noqa: E402
+from PySide6.QtGui import QFont, QFontMetrics  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -310,6 +311,36 @@ class TestKioskBehavior(GuiTestBase):
             QTest.qWait(900)  # debounce (400ms) + reload + rebuild
             self.assertEqual(len(win.apps), 3)
             self.assertEqual(len(self._app_buttons(win)), 3)
+
+
+class TestTextWrapping(GuiTestBase):
+    @staticmethod
+    def _font():
+        f = QFont()
+        f.setPixelSize(20)
+        f.setWeight(QFont.Weight.DemiBold)
+        return f
+
+    def test_wrapped_lines_fit_max_width(self):
+        fm = QFontMetrics(self._font())
+        for name in (
+            "Microsoft PowerPoint",
+            "Visual Studio Code",
+            "IntelliJ IDEA",
+            "Microsoft Publisher",
+            "A" * 40,
+        ):
+            wrapped = k.wrap_text(name, self._font(), 130)
+            for line in wrapped.split("\n"):
+                self.assertLessEqual(fm.horizontalAdvance(line), 130)
+
+    def test_long_name_wraps_to_multiple_lines(self):
+        wrapped = k.wrap_text("Microsoft PowerPoint", self._font(), 130)
+        self.assertGreaterEqual(len(wrapped.split("\n")), 2)
+
+    def test_short_name_stays_single_line(self):
+        wrapped = k.wrap_text("GIMP", self._font(), 130)
+        self.assertEqual(wrapped, "GIMP")
 
 
 class TestLayoutAndOverflow(GuiTestBase):
