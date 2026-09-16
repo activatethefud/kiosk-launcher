@@ -1,4 +1,4 @@
-# AGENT.md — guidance for AI coding agents working on this repository
+# AGENTS.md — guidance for AI coding agents working on this repository
 
 ## What this project is
 
@@ -17,12 +17,10 @@ tests/test_gui.py       # QTest behavior tests (clicks, dialogs, live reload)
 apps.json              # app search templates (editable, copyable, TRACKED in git)
 Kiosk.spec             # PyInstaller spec: windowed build, bundles apps.json
 .github/workflows/build.yml  # CI: run tests + build Kiosk-windows.zip
-kiosk-watchdog.bat     # Windows: relaunch the launcher if it crashes
-kiosk-shell.bat        # Windows: enable/disable the registry kiosk shell (Plan B)
-install.bat            # Windows: one-shot client installer (copy to C:\Kiosk + enable)
+kiosk.bat              # Windows: install + enable/disable the kiosk shell (HKCU)
 diagnose-windows.ps1   # Windows: machine-level diagnostic (VC++ runtime, Qt plugin, event log)
 README.md              # user-facing docs + Windows shell deployment recipe
-AGENT.md               # this file
+AGENTS.md              # this file
 .gitattributes         # CRLF for *.bat on checkout
 kiosk_config.json      # runtime-generated settings + password, GITIGNORED
 ```
@@ -50,6 +48,37 @@ python3 -m py_compile kiosk_launcher.py
 # headless GUI smoke test
 QT_QPA_PLATFORM=offscreen python3 kiosk_launcher.py --smoke
 ```
+
+### Testing the Windows batch scripts (Linux, via Wine)
+
+The `*.bat` scripts are Windows-only. On a Linux dev box, if Wine is present
+(`which wine`), use it to actually run them rather than only eyeballing them:
+`wine cmd /c` maps `C:\` to a prefix's `drive_c`, so `C:\Kiosk` is just a
+folder inside the prefix.
+
+```bash
+export WINEDEBUG=-all
+export WINEPREFIX=$(mktemp -d)/prefix
+wineboot -i                                   # one-time prefix init
+mkdir -p "$WINEPREFIX/drive_c/src"
+cp kiosk.bat "$WINEPREFIX/drive_c/src/"
+printf x > "$WINEPREFIX/drive_c/src/Kiosk.exe"   # dummy payload for install
+wine cmd /c 'cd /d C:\src && kiosk.bat install'
+wine cmd /c 'cd /d C:\Kiosk && kiosk.bat status'
+rm -rf "$WINEPREFIX"                          # throw the prefix away afterwards
+```
+
+Notes:
+
+- Always use a throwaway `WINEPREFIX`; `reg add HKCU\...` writes land in that
+  prefix, never on the real machine.
+- Wine's `xcopy` / `mkdir` / `reg` are close enough to exercise control flow,
+  error handling and exit codes, but they do **not** prove real Windows ACL/UAC
+  behavior.
+- Batch parsing of `goto`, labels and parenthesised blocks is the usual failure
+  mode: exercise every subcommand (`install` / `enable` / `disable` / `status`)
+  plus bad/absent arguments, and check `%ERRORLEVEL%`.
+- If Wine is not installed, skip this and rely on the unit/GUI tests.
 
 ## Dependencies
 
@@ -174,16 +203,20 @@ version's changelog entry. Trivial doc/test tweaks may skip a bump entirely.
 
 ## Deployment notes (Windows custom shell)
 
-Freeze with PyInstaller (`--onefile --windowed`), then set the shell per-user:
+Freeze with PyInstaller (`Kiosk.spec`, onedir + windowed), then install and set
+the shell per-user — `kiosk.bat` only ever writes the current user's HKCU:
 
-```
-reg add "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "C:\Kiosk\Kiosk.exe" /f
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableTaskMgr /t REG_DWORD /d 1 /f
+```bat
+kiosk.bat install        :: copy the folder to C:\Kiosk (no elevation)
+kiosk.bat enable         :: run AS the kiosk user; sets HKCU\...\Winlogon\Shell
+kiosk.bat disable        :: restores explorer.exe for the current user
+kiosk.bat status         :: show the current shell + policy values
 ```
 
 See README.md for the full recipe, including why the **HKLM** shell value must
 be avoided and why an admin escape-hatch account is required.
 
-For the simpler "run on top of Windows" deployment, use `kiosk-watchdog.bat`
-in the student's Startup folder to auto-relaunch on crash (stops on a clean
-admin Exit, or when a `stop.kiosk` marker file is present).
+There is deliberately **no watchdog**: the `Shell` value must be an `.exe`, so
+`Kiosk.exe` runs directly and a crash leaves a shell-less session. Recover by
+logging in on the admin account and running `kiosk.bat disable` for the kiosk
+user (e.g. `runas /user:Student "C:\Kiosk\kiosk.bat disable"`).

@@ -52,9 +52,7 @@ jobs:
           Copy-Item README.md            dist\Kiosk\README.md          -Force
           Copy-Item CHANGELOG.md         dist\Kiosk\CHANGELOG.md       -Force
           Copy-Item LICENSE              dist\Kiosk\LICENSE            -Force
-          Copy-Item install.bat          dist\Kiosk\install.bat        -Force
-          Copy-Item kiosk-watchdog.bat   dist\Kiosk\kiosk-watchdog.bat -Force
-          Copy-Item kiosk-shell.bat      dist\Kiosk\kiosk-shell.bat    -Force
+          Copy-Item kiosk.bat            dist\Kiosk\kiosk.bat          -Force
           Copy-Item diagnose-windows.ps1 dist\Kiosk\diagnose-windows.ps1 -Force
           Get-ChildItem dist\Kiosk | Select-Object Name
       - name: Zip

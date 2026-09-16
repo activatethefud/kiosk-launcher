@@ -39,12 +39,10 @@ more apps by regex.
 kiosk_launcher.py           # the entire application (single file)
 apps.json                   # app search templates (editable, copyable)
 Kiosk.spec                  # PyInstaller spec (windowed build, bundles apps.json)
-kiosk-watchdog.bat          # Windows: relaunch the launcher on crash
-kiosk-shell.bat             # Windows: enable/disable the registry kiosk shell
-install.bat                 # Windows: one-shot client installer (copy + enable)
+kiosk.bat                   # Windows: install + enable/disable the kiosk shell
 tests/test_kiosk_launcher.py
 tests/test_gui.py           # QTest behavior tests (clicks, dialogs, live reload)
-AGENT.md                    # guidance for AI coding agents
+AGENTS.md                   # guidance for AI coding agents
 README.md
 .gitattributes              # CRLF line endings for *.bat
 kiosk_config.json           # runtime-generated settings + password, not committed
@@ -131,12 +129,12 @@ QT_QPA_PLATFORM=offscreen python3 kiosk_launcher.py --smoke
 
 There are no runtime dependencies beyond PySide6, and the core (discovery,
 config, password) is stdlib-only so `--scan`/`--set-password` work without
-it. See [AGENT.md](AGENT.md) for architecture details and coding conventions.
+it. See [AGENTS.md](AGENTS.md) for architecture details and coding conventions.
 
 ## Deploy on Windows
 
 The launcher ships as a folder (`dist\Kiosk\`) containing `Kiosk.exe` and its
-runtime. Two deployment modes are supported; pick one per lab.
+runtime. It is deployed as the student's shell (replacing `explorer.exe`):
 
 ### 1. Build once (on any Windows machine or VM)
 
@@ -158,68 +156,50 @@ pyinstaller --noconfirm --clean Kiosk.spec
 
 ### 2. Client install (repeat on every lab machine)
 
-Common to both modes:
-
 1. Create two local accounts:
    - **Admin** — administrator, normal desktop (your escape hatch).
    - **Student** — *standard* (non-admin) user.
-2. Copy the whole `dist\Kiosk\` folder to `C:\Kiosk\`. Drop your customized
-   `apps.json` next to `Kiosk.exe` if you have one.
+2. Copy the whole `dist\Kiosk\` folder to `C:\Kiosk\` — either manually, or by
+   running `kiosk.bat install` (it copies the folder it lives in; no admin
+   needed unless `C:\Kiosk` already exists with a restrictive ACL).
+   Drop your customized `apps.json` next to `Kiosk.exe` if you have one.
 3. Log in as Student and confirm the launcher finds the installed apps:
    `C:\Kiosk\Kiosk.exe --scan` (or use **Admin → Rescan**). Then change the
    admin password via **Admin → Change password…** (the windowed exe has no
    console, so use the GUI rather than `--set-password`).
 
-Then choose one mode:
+#### Replace explorer.exe (true kiosk shell, works on Home + Pro)
 
-#### Mode A — autostart on top of Windows (lower risk, easy to revert)
-
-- Put a shortcut in the Student's Startup folder (`shell:startup`) with target
-  `C:\Kiosk\kiosk-watchdog.bat --kiosk`.
-- Lock policies with [Policy Plus](https://github.com/Fleex255/PolicyPlus)
-  (Home) or `gpedit.msc` (Pro): disable Task Manager, Win+X, Alt+Tab, etc.
-
-#### Mode B — replace explorer.exe (true kiosk shell, works on Home + Pro)
-
-The repo includes `kiosk-shell.bat` to do this safely, plus a one-shot
-`install.bat` (self-elevates, copies everything to `C:\Kiosk`, enables the
-shell). It **self-elevates** (UAC prompt) and writes to the student's offline
-registry hive, so the student account is always targeted correctly.
-
-Enable (the target user must be logged off) — quickest way:
+`kiosk.bat` sets the **current user's** `HKCU\...\Winlogon\Shell` value to
+`C:\Kiosk\Kiosk.exe` and disables Task Manager, Lock, and Change Password for
+that user. Because it's a per-user HKCU key it needs **no admin rights** — just
+log in as the kiosk user and run (the whole script is elevation-free):
 
 ```bat
-install.bat              (defaults to "Student")
-install.bat TheirName    (other username)
+C:\Kiosk\kiosk.bat enable
 ```
 
-Or use `kiosk-shell.bat` directly:
+Then log off and back on to enter kiosk mode.
+
+Check what's currently set (e.g. to diagnose "works on one PC, not another"):
 
 ```bat
-C:\Kiosk\kiosk-shell.bat enable            (defaults to "Student")
-C:\Kiosk\kiosk-shell.bat enable TheirName  (other username)
+C:\Kiosk\kiosk.bat status
 ```
 
-This sets the student's shell to `C:\Kiosk\Kiosk.exe` and disables Task
-Manager, Lock, and Change Password for that user. Log off and back on.
-
-Check what's currently set (to diagnose "works on one PC, not another"):
+Recovery (the admin account still has a normal desktop): from an admin prompt
+aim the disable at the kiosk user, or run it while logged in as that user:
 
 ```bat
-C:\Kiosk\kiosk-shell.bat check             (run AS the student, no admin)
-C:\Kiosk\kiosk-shell.bat check Student     (run as admin, student logged off)
+runas /user:Student "C:\Kiosk\kiosk.bat disable"
 ```
 
-> Do **not** set the HKLM `Shell` value or you can lock yourself out. Keep the
-> Admin account on the normal explorer shell.
+This restores `explorer.exe` and re-enables the CAD options; log off and back
+on for a normal desktop.
 
-Recovery (run as admin, with the student logged off):
-
-```bat
-C:\Kiosk\kiosk-shell.bat disable Student
-```
-
-This restores `explorer.exe` and re-enables the CAD options for the student.
+> Do **not** set the HKLM `Shell` value or you can lock yourself out. `kiosk.bat`
+> only ever writes the current user's HKCU, so the Admin account is never
+> affected.
 
 #### Verify on each client
 
@@ -227,7 +207,8 @@ This restores `explorer.exe` and re-enables the CAD options for the student.
 - [ ] `Alt+Tab`, Win key, `Ctrl+Esc`, and `Alt+F4` prompt for the password
 - [ ] Task Manager is disabled (Ctrl+Alt+Del has no Task Manager)
 - [ ] Editing `apps.json` shows up without restarting (live reload)
-- [ ] Admin → Exit (password) stops the watchdog (Mode A)
+- [ ] Recovery works: `kiosk.bat disable` from the admin account restores the
+      normal desktop
 
 > **Always test in a VM or on a spare machine first**, and keep an admin
 > account with a normal desktop.
@@ -316,36 +297,8 @@ can switch keyboard layouts; everything else listed above is blocked.
 > **Ctrl+Alt+Del cannot be intercepted by any application** — it's the Windows
 > Secure Attention Sequence, handled by winlogon before hooks see it. Neuter
 > the CAD screen instead: disable Task Manager, Lock, and Change Password via
-> Policy Plus / Group Policy, or the registry keys in `kiosk-watchdog.bat`.
-
-### Watchdog (auto-relaunch on crash)
-
-`kiosk-watchdog.bat` supervises the launcher in a loop:
-
-```text
-:loop
-   if stop.kiosk exists → delete it, stop
-   run Kiosk.exe %*
-   if exit code == 0  → stop          (admin exited via password)
-   else              → wait 2 s → loop again
-```
-
-| Kiosk.exe exit | Watchdog action |
-|---|---|
-| `0` — admin menu → Exit (password) | **stop** (so you can get back in) |
-| non-zero — crash or `taskkill /f` | wait 2 s, **relaunch** |
-| `stop.kiosk` marker file present | delete the marker, **stop** |
-
-Notes:
-
-- It looks for `Kiosk.exe` in **`C:\Kiosk`** (falls back to the script's own
-  folder if not found there).
-- It's for **Mode A**: drop a shortcut in `shell:startup` pointing at
-  `C:\Kiosk\kiosk-watchdog.bat --kiosk`.
-- It **can't be the shell itself** — the registry `Shell` value must be an
-  `.exe`, so Mode B runs `Kiosk.exe` directly.
-- Three commented-out `reg add` lines (DisableTaskMgr / DisableLockWorkstation
-  / DisableChangePassword) harden the Ctrl+Alt+Del screen if un-commented.
+> Policy Plus / Group Policy, or `kiosk.bat enable` (which sets the HKCU keys
+> for the current user).
 
 ## Config reference (`kiosk_config.json`)
 

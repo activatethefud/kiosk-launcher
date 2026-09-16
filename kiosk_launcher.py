@@ -47,7 +47,7 @@ import time
 import traceback
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
