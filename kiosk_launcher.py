@@ -10,7 +10,8 @@ Linux for development and testing.
 
 Features
 --------
-* Built-in presets: LibreOffice, Scratch, Visual Studio Code, VSCodium, Word
+* Built-in presets: LibreOffice, OpenOffice, OnlyOffice, Microsoft Office,
+  Scratch, VS Code, VSCodium, and many more
 * Dynamic discovery: PATH, Program Files, Windows "App Paths" registry,
   .desktop files, /opt, snap/flatpak export dirs, AppData/Programs
 * Password-protected admin area to add more apps by name + regex
@@ -47,7 +48,7 @@ import time
 import traceback
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
@@ -55,10 +56,32 @@ DEFAULT_PASSWORD = "admin"
 # against each discovered executable's full path.
 # --------------------------------------------------------------------------
 BUILTIN_APPS = [
-    # Office / general
+    # Office suites / general
     {
         "name": "LibreOffice",
-        "patterns": [r"soffice(?:\.exe)?$", r"libreoffice(?:\.exe)?$"],
+        # Anchor on the install directory so LibreOffice and OpenOffice
+        # (both ship a "soffice" binary) never match each other.
+        "patterns": [
+            r"[\\/]libreoffice[\\/].*soffice(?:\.exe|\.bin)?$",
+            r"[\\/]libreoffice(?:\.exe)?$",
+            r"org\.libreoffice\.libreoffice(?:\.exe)?$",
+        ],
+        "args": [],
+    },
+    {
+        "name": "OpenOffice",
+        "patterns": [
+            r"[\\/]openoffice(?: ?4|\.org)?[\\/].*soffice(?:\.exe|\.bin)?$",
+            r"[\\/]openoffice(?:4|\.org)?(?:\.exe)?$",
+        ],
+        "args": [],
+    },
+    {
+        "name": "OnlyOffice",
+        "patterns": [
+            r"onlyoffice[\\/].*?(?:desktopeditors|editors)(?:\.exe)?$",
+            r"onlyoffice-desktopeditors(?:\.exe)?$",
+        ],
         "args": [],
     },
     {
@@ -368,6 +391,8 @@ BUILTIN_APPS = [
 # Friendly icons shown on the buttons (cosmetic only).
 EMOJI = {
     "libreoffice": "\U0001F4DD",
+    "openoffice": "\U0001F4D8",
+    "onlyoffice": "\U0001F4D9",
     "microsoft word": "\U0001F4C4",
     "scratch": "\U0001F431",
     "visual studio code": "\U0001F5A5\uFE0F",
@@ -604,7 +629,10 @@ def normalize_app(entry):
         args = shlex.split(args, posix=(os.name == "posix"))
     if not isinstance(args, list):
         args = []
-    return {"name": name.strip(), "patterns": patterns, "args": args}
+    clean = {"name": name.strip(), "patterns": patterns, "args": args}
+    if entry.get("elevated"):
+        clean["elevated"] = True
+    return clean
 
 
 def _bundled_apps_path():
@@ -944,7 +972,10 @@ def discover_apps(apps):
                 args = shlex.split(args, posix=(os.name == "posix"))
             elif not isinstance(args, list):
                 args = []
-            found.append({"name": name, "path": hit, "args": args})
+            entry = {"name": name, "path": hit, "args": args}
+            if app.get("elevated"):
+                entry["elevated"] = True
+            found.append(entry)
         else:
             missing.append(str(name))
     return found, missing
@@ -953,6 +984,46 @@ def discover_apps(apps):
 # Keep references to launched children so they aren't GC'd while running
 # (avoids ResourceWarning) and are pruned once finished.
 _children = []
+
+
+def _shell_execute(path, verb, params, cwd):
+    """Thin, patchable wrapper around the Win32 ShellExecuteW call."""
+    import ctypes
+    return ctypes.windll.shell32.ShellExecuteW(None, verb, path, params, cwd, 1)
+
+
+def _shell_execute_runas(path, args, cwd=None):
+    """Windows: start path elevated (UAC) via ShellExecuteW "runas".
+
+    Returns None on success or an error string. ShellExecute returns a code
+    <= 32 on failure (including 5 when the user declines the UAC prompt).
+    """
+    try:
+        params = subprocess.list2cmdline(list(args)) if args else None
+        rc = _shell_execute(path, "runas", params, cwd)
+        if int(rc) <= 32:
+            return f"elevation failed (ShellExecuteW returned {int(rc)})"
+    except Exception as e:              # noqa: BLE001 - surfaced to the UI
+        return str(e)
+    return None
+
+
+def _launch_elevated(path, args, cwd=None):
+    """Launch path with elevated privileges (Windows UAC / Linux pkexec)."""
+    if os.name == "nt":
+        return _shell_execute_runas(path, args, cwd)
+    pkexec = shutil.which("pkexec")
+    if not pkexec:
+        return "elevated launch needs pkexec on Linux"
+    try:
+        proc = subprocess.Popen(
+            [pkexec, path] + list(args), cwd=cwd, start_new_session=True
+        )
+    except Exception as e:              # noqa: BLE001
+        return str(e)
+    _children.append(proc)
+    _children[:] = [p for p in _children if p.poll() is None]
+    return None
 
 
 def launch(app):
@@ -966,6 +1037,8 @@ def launch(app):
     elif not isinstance(args, list):
         args = []
     cwd = os.path.dirname(path) or None
+    if isinstance(app, dict) and app.get("elevated"):
+        return _launch_elevated(path, args, cwd)
     try:
         if os.name == "nt":
             if "WindowsApps" in path:   # App Execution Alias stub
@@ -981,6 +1054,61 @@ def launch(app):
     _children.append(proc)
     _children[:] = [p for p in _children if p.poll() is None]
     return None
+
+
+# --------------------------------------------------------------------------
+# Terminals and power actions (used by the admin menu)
+# --------------------------------------------------------------------------
+TERMINALS = {
+    "cmd": ["cmd.exe", "cmd"],
+    "powershell": ["powershell.exe", "pwsh.exe", "pwsh", "powershell"],
+}
+
+
+def find_terminal(kind):
+    """Return the full path to a terminal executable, or None if absent."""
+    for name in TERMINALS.get(kind, []):
+        p = shutil.which(name)
+        if p:
+            return p
+    return None
+
+
+def _run_detached(argv):
+    """Start argv without waiting. Returns None or an error string."""
+    try:
+        subprocess.Popen(
+            list(argv),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:              # noqa: BLE001
+        return str(e)
+    return None
+
+
+def shutdown_system():
+    """Power the machine off. Returns None or an error string."""
+    if os.name == "nt":
+        return _run_detached(["shutdown", "/s", "/t", "0"])
+    if shutil.which("systemctl"):
+        return _run_detached(["systemctl", "poweroff"])
+    if shutil.which("shutdown"):
+        return _run_detached(["shutdown", "-h", "now"])
+    return "no shutdown command found"
+
+
+def logout_user():
+    """Log the current user out. Returns None or an error string."""
+    if os.name == "nt":
+        return _run_detached(["shutdown", "/l"])
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    if user and shutil.which("loginctl"):
+        return _run_detached(["loginctl", "terminate-user", user])
+    if shutil.which("gnome-session-quit"):
+        return _run_detached(["gnome-session-quit", "--logout", "--no-prompt"])
+    return "no logout command found"
 
 
 # ==========================================================================
@@ -1262,6 +1390,7 @@ try:
     from PySide6.QtGui import QFont, QFontMetrics
     from PySide6.QtWidgets import (
         QApplication,
+        QCheckBox,
         QDialog,
         QDialogButtonBox,
         QFormLayout,
@@ -1340,9 +1469,12 @@ if _HAS_QT:
             self.args_edit = QLineEdit()
             self.args_edit.setObjectName("addapp_args")
             self.args_edit.setPlaceholderText("optional arguments")
+            self.elevated_check = QCheckBox("Run as administrator (Windows UAC)")
+            self.elevated_check.setObjectName("addapp_elevated")
             form.addRow("Name:", self.name_edit)
             form.addRow("Match (regex):", self.patterns_edit)
             form.addRow("Arguments:", self.args_edit)
+            form.addRow("", self.elevated_check)
             buttons = QDialogButtonBox(
                 QDialogButtonBox.Ok | QDialogButtonBox.Cancel
             )
@@ -1379,6 +1511,7 @@ if _HAS_QT:
                     if l.strip()
                 ],
                 "args": args,
+                "elevated": self.elevated_check.isChecked(),
                 "custom": True,
             }
 
@@ -1554,7 +1687,10 @@ if _HAS_QT:
                 btn.setObjectName("app:" + a["name"])
                 btn.setFixedSize(preset["width"], preset["height"])
                 btn.setFont(card_font)
-                btn.setToolTip(a["path"])
+                tip = a["path"]
+                if a.get("elevated"):
+                    tip += "\nRuns as administrator"
+                btn.setToolTip(tip)
                 btn.setText(f"{icon}\n{wrap_text(a['name'], card_font, max_wrap)}")
                 btn.clicked.connect(lambda _=False, a=a: self.launch(a))
                 self.grid.addWidget(btn, i // cols, i % cols)
@@ -1600,6 +1736,22 @@ if _HAS_QT:
                 menu.addAction("\u2796  Remove app\u2026", self.remove_app)
                 menu.addAction("\U0001F511  Change password\u2026", self.change_password)
                 menu.addAction("\U0001F504  Rescan", self.rebuild)
+                menu.addSeparator()
+                term = menu.addMenu("\U0001F5A5  Terminal")
+                term.addAction("Command Prompt", lambda: self.open_terminal("cmd"))
+                term.addAction(
+                    "Command Prompt (administrator)",
+                    lambda: self.open_terminal("cmd", elevated=True),
+                )
+                term.addAction("PowerShell", lambda: self.open_terminal("powershell"))
+                term.addAction(
+                    "PowerShell (administrator)",
+                    lambda: self.open_terminal("powershell", elevated=True),
+                )
+                menu.addSeparator()
+                menu.addAction("\u23FB  Shut down\u2026", self.shutdown_now)
+                menu.addAction("\U0001F6B6  Log out\u2026", self.logout_now)
+                menu.addSeparator()
                 menu.addAction("\U0001F6AA  Exit", self.quit_now)
                 menu.exec(
                     self.admin_btn.mapToGlobal(QPoint(0, self.admin_btn.height()))
@@ -1647,6 +1799,41 @@ if _HAS_QT:
             set_password(self.cfg, new1)
             save_config(self.cfg, self.cfg_path)
             QMessageBox.information(self, "Done", "Password updated.")
+
+        def open_terminal(self, kind, elevated=False):
+            path = find_terminal(kind)
+            if not path:
+                QMessageBox.warning(
+                    self, "Not found", f"Could not find {kind} on this machine."
+                )
+                return
+            err = launch(
+                {"name": kind, "path": path, "args": [], "elevated": elevated}
+            )
+            if err:
+                QMessageBox.warning(self, "Launch failed", err)
+            else:
+                self.status_label.setText(
+                    f"Opened {kind}" + (" as administrator" if elevated else "")
+                )
+
+        def shutdown_now(self):
+            if QMessageBox.question(
+                self, "Shut down", "Shut down this computer now?"
+            ) != QMessageBox.Yes:
+                return
+            err = shutdown_system()
+            if err:
+                QMessageBox.warning(self, "Shut down failed", err)
+
+        def logout_now(self):
+            if QMessageBox.question(
+                self, "Log out", "Log out of this account now?"
+            ) != QMessageBox.Yes:
+                return
+            err = logout_user()
+            if err:
+                QMessageBox.warning(self, "Log out failed", err)
 
         def quit_now(self):
             QApplication.instance().quit()

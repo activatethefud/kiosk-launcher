@@ -2,8 +2,25 @@
   {
     "name": "LibreOffice",
     "patterns": [
-      "soffice(?:\\.exe)?$",
-      "libreoffice(?:\\.exe)?$"
+      "[\\\\/]libreoffice[\\\\/].*soffice(?:\\.exe|\\.bin)?$",
+      "[\\\\/]libreoffice(?:\\.exe)?$",
+      "org\\.libreoffice\\.libreoffice(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "OpenOffice",
+    "patterns": [
+      "[\\\\/]openoffice(?: ?4|\\.org)?[\\\\/].*soffice(?:\\.exe|\\.bin)?$",
+      "[\\\\/]openoffice(?:4|\\.org)?(?:\\.exe)?$"
+    ],
+    "args": []
+  },
+  {
+    "name": "OnlyOffice",
+    "patterns": [
+      "onlyoffice[\\\\/].*?(?:desktopeditors|editors)(?:\\.exe)?$",
+      "onlyoffice-desktopeditors(?:\\.exe)?$"
     ],
     "args": []
   },

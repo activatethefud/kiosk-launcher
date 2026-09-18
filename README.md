@@ -8,7 +8,8 @@ more apps by regex.
 ## Features
 
 - **Presets:** the Microsoft Office suite (Word, Excel, PowerPoint, Outlook,
-  OneNote, Access, Publisher, Visio, Project), LibreOffice, Scratch, VS Code,
+  OneNote, Access, Publisher, Visio, Project), LibreOffice, OpenOffice,
+  OnlyOffice, Scratch, VS Code,
   VSCodium, GIMP, text editors (Notepad++, Sublime Text, gedit, Kate, Vim,
   Emacs, Geany), dev editors (PyCharm, IntelliJ IDEA, Eclipse, Code::Blocks,
   Dev-C++), FOSS video editors (Kdenlive, Shotcut, OpenShot, Olive, Avidemux,
@@ -24,7 +25,10 @@ more apps by regex.
     `~/.local/bin`, and `.desktop` files
 - **Admin area (password-protected):**
   - Add an app by name + one-or-more regexes (matched against the exe path)
+  - Mark an app to **run as administrator** (Windows UAC / Linux `pkexec`)
   - Remove apps, change the password, rescan
+  - Open **Command Prompt** / **PowerShell**, each optionally as administrator
+  - **Shut down** or **log out** of the machine (after a confirmation)
 - **Kiosk mode:** frameless fullscreen; exiting requires the admin password.
   Escape hotkeys (Win key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc,
   Alt+Space) are intercepted on Windows and route to the admin password prompt.
@@ -80,6 +84,8 @@ python3 kiosk_launcher.py --apps A.json      # use a different app list
 
    The regex is matched case-insensitively against each discovered
    executable's full path. Use `$` to anchor to the filename.
+4. Tick **Run as administrator** if the app must launch elevated (Windows
+   UAC prompt / Linux `pkexec`).
 
 The added entry is saved to `apps.json` and the launcher rescans
 immediately.
@@ -104,6 +110,8 @@ immediately.
   discovered executable's **full path**. Anchor with `$`. A bare string is
   accepted and treated as a single pattern.
 - `args` — optional launch arguments (string or list).
+- `elevated` — optional `true` to launch this app with administrator
+  privileges (Windows `runas`/UAC, Linux `pkexec`). Defaults to false.
 
 This file is intentionally plain and machine-editable: have an LLM add a
 hundred app patterns, then copy the same `apps.json` to every client. On

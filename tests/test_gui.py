@@ -23,6 +23,7 @@ from PySide6.QtGui import QFont, QFontMetrics  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
+    QCheckBox,
     QDialog,
     QLabel,
     QLineEdit,
@@ -85,6 +86,18 @@ def _dismiss_message():
     w = _active_modal()
     if w is not None and isinstance(w, (QMessageBox, QDialog)):
         w.accept()
+
+
+def _answer_question(yes=True):
+    """Click Yes/No on the active QMessageBox question; True if one was found."""
+    w = _active_modal()
+    if isinstance(w, QMessageBox):
+        btn = w.button(QMessageBox.Yes if yes else QMessageBox.No)
+        if btn is not None:
+            btn.click()
+            return True
+        w.accept()
+    return False
 
 
 def _click_ok(dlg):
@@ -258,6 +271,116 @@ class TestAdminFlow(GuiTestBase):
         self.assertEqual(v["name"], "Gamma")
         self.assertEqual(v["patterns"], ["gamma$", "beta$"])
         self.assertEqual(v["args"], ["--flag", "--two"])
+        self.assertFalse(v["elevated"])
+
+    def test_add_app_dialog_elevated_checkbox(self):
+        dlg = k.AddAppDialog()
+        self.addCleanup(dlg.deleteLater)
+        dlg.name_edit.setText("Elevated Tool")
+        dlg.patterns_edit.setPlainText(r"tool\.exe$")
+        dlg.findChild(QCheckBox, "addapp_elevated").setChecked(True)
+        self.assertTrue(dlg.values()["elevated"])
+
+    def test_add_app_flow_saves_elevated(self):
+        win, cfg, cfg_path, apps_path, apps = self.make_window(password="secret")
+
+        def fill_add_dialog():
+            dlg = _active_modal()
+            assert dlg is not None
+            dlg.findChild(QLineEdit, "addapp_name").setText("Admin Shell")
+            dlg.findChild(QPlainTextEdit, "addapp_patterns").setPlainText(r"cmd\.exe$")
+            dlg.findChild(QCheckBox, "addapp_elevated").setChecked(True)
+            _click_ok(dlg)
+
+        QTimer.singleShot(100, lambda: _fill_input("secret"))
+        QTimer.singleShot(300, lambda: _trigger_menu("Add app"))
+        QTimer.singleShot(600, fill_add_dialog)
+        win.on_admin()
+
+        loaded, _ = k.load_apps(apps_path)
+        entry = [a for a in loaded if a["name"] == "Admin Shell"][0]
+        self.assertTrue(entry.get("elevated"))
+
+    def test_admin_menu_has_power_and_terminal_actions(self):
+        win, *_ = self.make_window(password="secret")
+        seen = []
+
+        def inspect_menu():
+            menu = _active_menu()
+            if menu is None:
+                return
+            top = [a.text() for a in menu.actions()]
+            sub = [
+                a.text()
+                for act in menu.actions()
+                if act.menu() is not None
+                for a in act.menu().actions()
+            ]
+            seen.append((top, sub))
+            menu.close()
+
+        QTimer.singleShot(100, lambda: _fill_input("secret"))
+        QTimer.singleShot(400, inspect_menu)
+        win.on_admin()
+
+        self.assertEqual(len(seen), 1)
+        top, sub = seen[0]
+        self.assertTrue(any("Shut down" in t for t in top))
+        self.assertTrue(any("Log out" in t for t in top))
+        self.assertTrue(any("Terminal" in t for t in top))
+        self.assertTrue(any("Command Prompt" in t for t in sub))
+        self.assertTrue(any("PowerShell" in t for t in sub))
+        self.assertTrue(any("administrator" in t for t in sub))
+
+    def test_shutdown_action_confirms_and_calls(self):
+        win, *_ = self.make_window(password="secret")
+        with mock.patch.object(k, "shutdown_system", return_value=None) as m:
+            QTimer.singleShot(100, lambda: _fill_input("secret"))
+            QTimer.singleShot(300, lambda: _trigger_menu("Shut down"))
+            QTimer.singleShot(600, lambda: _answer_question(True))
+            win.on_admin()
+        m.assert_called_once()
+
+    def test_shutdown_action_cancelled_does_nothing(self):
+        win, *_ = self.make_window(password="secret")
+        with mock.patch.object(k, "shutdown_system", return_value=None) as m:
+            QTimer.singleShot(100, lambda: _fill_input("secret"))
+            QTimer.singleShot(300, lambda: _trigger_menu("Shut down"))
+            QTimer.singleShot(600, lambda: _answer_question(False))
+            win.on_admin()
+        m.assert_not_called()
+
+    def test_logout_action_confirms_and_calls(self):
+        win, *_ = self.make_window(password="secret")
+        with mock.patch.object(k, "logout_user", return_value=None) as m:
+            QTimer.singleShot(100, lambda: _fill_input("secret"))
+            QTimer.singleShot(300, lambda: _trigger_menu("Log out"))
+            QTimer.singleShot(600, lambda: _answer_question(True))
+            win.on_admin()
+        m.assert_called_once()
+
+    def test_open_terminal_launches_elevated(self):
+        win, *_ = self.make_window(password="secret")
+        with mock.patch.object(k, "find_terminal", return_value="/usr/bin/fakecmd"), \
+             mock.patch.object(k, "launch", return_value=None) as m:
+            win.open_terminal("cmd", elevated=True)
+        m.assert_called_once()
+        app = m.call_args[0][0]
+        self.assertEqual(app["path"], "/usr/bin/fakecmd")
+        self.assertTrue(app["elevated"])
+
+    def test_open_terminal_missing_shows_warning(self):
+        win, *_ = self.make_window(password="secret")
+        warnings = []
+        with mock.patch.object(k, "find_terminal", return_value=None):
+            def grab():
+                w = _active_modal()
+                if isinstance(w, QMessageBox):
+                    warnings.append(w)
+                    w.accept()
+            QTimer.singleShot(100, grab)
+            win.open_terminal("cmd")
+        self.assertEqual(len(warnings), 1)
 
     def test_add_app_flow(self):
         win, cfg, cfg_path, apps_path, apps = self.make_window(password="secret")

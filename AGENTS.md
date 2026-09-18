@@ -91,16 +91,18 @@ Notes:
 Top-level functions (module `kiosk_launcher`):
 
 - `BUILTIN_APPS` — seed presets, used only to populate `apps.json` when it is
-  missing. Entries: `{"name", "patterns": [regex...], "args"}`. Regexes are
-  matched **case-insensitively** against candidate exe **full paths** with
-  `re.search`. Always anchor to the filename with `$`.
+  missing. Entries: `{"name", "patterns": [regex...], "args", "elevated"?}`.
+  Regexes are matched **case-insensitively** against candidate exe **full
+  paths** with `re.search`. Always anchor to the filename with `$`; when
+  several suites ship the same binary name, anchor on the install directory
+  (LibreOffice and OpenOffice both ship `soffice`).
 - `seed_config()` / `load_config(path)` / `save_config(cfg, path)` — settings +
   password I/O (no app data). `load_config` repairs missing keys and is
   idempotent. Config is JSON.
 - `normalize_app(entry)` / `load_apps(path)` / `save_apps(apps, path)` /
   `add_app(apps, entry)` / `remove_apps(apps, names)` — the app list lives in
   `apps.json` (source of truth). `normalize_app` coerces string patterns/args
-  to lists and drops invalid entries. `load_apps` seeds the file from
+  to lists, preserves a truthy `elevated` flag, and drops invalid entries. `load_apps` seeds the file from
   `BUILTIN_APPS` when absent, falls back to presets in memory on parse errors
   (without overwriting the user's file), and respects an explicitly empty
   list. `add_app` appends a normalized entry (raising `ValueError` on invalid
@@ -113,12 +115,22 @@ Top-level functions (module `kiosk_launcher`):
 - `gather_candidates()` — returns a `set` of normalized executable paths,
   platform-specific (see "Discovery" below).
 - `discover_apps(apps)` — takes the app template list (NOT the config); returns
-  `(found, missing)` where `found` is a list of `{"name", "path", "args"}` and
-  `missing` is a list of names. A bad regex is reported as missing (stderr
+  `(found, missing)` where `found` is a list of
+  `{"name", "path", "args", "elevated"?}` and `missing` is a list of names.
+  A bad regex is reported as missing (stderr
   warning) rather than crashing.
 - `launch(app)` — `subprocess.Popen`, non-blocking; returns `None` or an error
   string. Windows Store aliases (paths containing `WindowsApps`) are launched
-  via `cmd /c start`.
+  via `cmd /c start`. When `app["elevated"]` is set it delegates to
+  `_launch_elevated` → `_shell_execute_runas` (Windows `ShellExecuteW` with the
+  `runas` verb / UAC; Linux `pkexec`). `_shell_execute` is a thin, patchable
+  wrapper around the Win32 call.
+- `find_terminal(kind)` / `shutdown_system()` / `logout_user()` — admin-menu
+  helpers. `find_terminal` resolves `cmd` / `powershell` via `shutil.which`
+  (`TERMINALS` maps kind → candidate exe names). The power actions call
+  `_run_detached` (`shutdown /s|/l` on Windows; `systemctl poweroff` /
+  `loginctl terminate-user` / `gnome-session-quit` on Linux). All return `None`
+  or an error string.
 - `is_blocked_hotkey(vk, alt_down, ctrl_down)` / `KioskHotkeyBlocker` (Windows
   only) — kiosk escape-hotkey blocking. `is_blocked_hotkey` is a pure,
   cross-platform decision function (unit-tested). `KioskHotkeyBlocker` installs
@@ -131,7 +143,10 @@ Top-level functions (module `kiosk_launcher`):
   when `_HAS_QT` is True) — importable for GUI tests.
   `MainWindow(cfg, cfg_path, apps, apps_path, kiosk)` is constructed explicitly
   (no closure variables). Widgets expose `objectName`s (e.g. `app:<name>`,
-  `addapp_name`, `removeapp_list`) for deterministic lookup in tests.
+  `addapp_name`, `addapp_elevated`, `removeapp_list`) for deterministic lookup
+  in tests. The password-gated admin menu offers add/remove/change-password/
+  rescan, a **Terminal** submenu (Command Prompt / PowerShell, each optionally
+  as administrator), and **Shut down** / **Log out** (both confirmed first).
 - `fatal_error(message)` / `error_log_path()` / `_install_excepthook()` —
   errors in a windowed build are invisible (stderr is discarded), so fatal
   errors are appended to `kiosk-error.log` next to the exe and shown in a

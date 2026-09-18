@@ -2,6 +2,19 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.8.0] - 2026-09-16
+
+- **Admin menu:** open **Command Prompt** / **PowerShell** (each optionally
+  **as administrator**) and **Shut down** / **Log out** of the machine; the
+  power actions ask for confirmation first.
+- **Run as administrator:** the Add-app form has a "Run as administrator"
+  checkbox that stores `"elevated": true` in `apps.json`; `launch()` then
+  starts the app elevated (Windows `runas`/UAC via `ShellExecuteW`, Linux
+  `pkexec`).
+- **Office suites:** split LibreOffice / OpenOffice / OnlyOffice with
+  install-directory–anchored patterns, so the shared `soffice` binary is no
+  longer ambiguous.
+
 ## [0.7.0] - 2026-09-16
 
 - **Deployment scripts unified:** one `kiosk.bat` with

@@ -249,6 +249,14 @@ class TestAppTemplates(unittest.TestCase):
     def test_normalize_app_rejects_whitespace_name(self):
         self.assertIsNone(k.normalize_app({"name": "   ", "patterns": ["x$"], "args": []}))
 
+    def test_normalize_app_keeps_elevated_flag(self):
+        app = k.normalize_app({"name": "X", "patterns": ["x$"], "elevated": True})
+        self.assertTrue(app["elevated"])
+
+    def test_normalize_app_omits_elevated_when_false(self):
+        app = k.normalize_app({"name": "X", "patterns": ["x$"]})
+        self.assertNotIn("elevated", app)
+
 
 # ---------------------------------------------------------------------------
 # Discovery
@@ -302,6 +310,18 @@ class TestDiscovery(unittest.TestCase):
         with mock.patch.object(k, "gather_candidates", return_value=candidates):
             found, _ = k.discover_apps(apps)
         self.assertEqual(found[0]["args"], ["--flag"])
+
+    def test_discover_propagates_elevated_flag(self):
+        candidates = {"/usr/bin/admin-tool"}
+        apps = [
+            {"name": "Admin Tool", "patterns": ["admin-tool$"], "elevated": True},
+            {"name": "Plain", "patterns": ["admin-tool$"]},
+        ]
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, _ = k.discover_apps(apps)
+        by_name = {a["name"]: a for a in found}
+        self.assertTrue(by_name["Admin Tool"]["elevated"])
+        self.assertNotIn("elevated", by_name["Plain"])
 
     def test_bad_regex_is_reported_missing_not_fatal(self):
         candidates = {"/usr/bin/app"}
@@ -550,6 +570,36 @@ class TestBuiltinPresets(unittest.TestCase):
             found, missing = k.discover_apps(apps)
         self.assertEqual({a["name"] for a in found}, names)
         self.assertEqual(missing, [])
+
+    def test_libreoffice_and_openoffice_are_distinct(self):
+        names = {"LibreOffice", "OpenOffice", "OnlyOffice"}
+        apps = [a for a in k.BUILTIN_APPS if a["name"] in names]
+        candidates = {
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\OpenOffice 4\program\soffice.exe",
+            r"C:\Program Files\ONLYOFFICE\DesktopEditors\DesktopEditors.exe",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        by_name = {a["name"]: a["path"] for a in found}
+        self.assertEqual(missing, [])
+        self.assertIn("libreoffice", by_name["LibreOffice"].lower())
+        self.assertIn("openoffice", by_name["OpenOffice"].lower())
+        self.assertIn("onlyoffice", by_name["OnlyOffice"].lower())
+
+    def test_libreoffice_and_openoffice_distinct_on_linux(self):
+        names = {"LibreOffice", "OpenOffice"}
+        apps = [a for a in k.BUILTIN_APPS if a["name"] in names]
+        candidates = {
+            "/usr/lib/libreoffice/program/soffice",
+            "/opt/openoffice4/program/soffice",
+        }
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        by_name = {a["name"]: a["path"] for a in found}
+        self.assertEqual(missing, [])
+        self.assertIn("libreoffice", by_name["LibreOffice"])
+        self.assertIn("openoffice", by_name["OpenOffice"])
 
     def test_vim_matches_gvim_not_neovim(self):
         apps = [a for a in k.BUILTIN_APPS if a["name"] == "Vim"]
@@ -963,6 +1013,105 @@ class TestLaunch(unittest.TestCase):
         self.assertIsNone(err)
         m.assert_called_once()
         self.assertEqual(m.call_args[0][0], [path])
+
+    def test_launch_elevated_windows_uses_shell_execute(self):
+        path = r"C:\Windows\System32\cmd.exe"
+        with mock.patch.object(k.os, "name", "nt"), \
+             mock.patch.object(k, "_shell_execute_runas", return_value=None) as m:
+            err = k.launch({"path": path, "args": ["/k"], "elevated": True})
+        self.assertIsNone(err)
+        m.assert_called_once()
+        self.assertEqual(m.call_args[0][0], path)
+        self.assertEqual(m.call_args[0][1], ["/k"])
+
+    def test_launch_elevated_windows_propagates_error(self):
+        with mock.patch.object(k.os, "name", "nt"), \
+             mock.patch.object(k, "_shell_execute_runas", return_value="denied"):
+            err = k.launch({"path": r"C:\x.exe", "args": [], "elevated": True})
+        self.assertEqual(err, "denied")
+
+    def test_launch_elevated_posix_uses_pkexec(self):
+        with mock.patch.object(k.os, "name", "posix"), \
+             mock.patch.object(k.shutil, "which", return_value="/usr/bin/pkexec"), \
+             mock.patch.object(k.subprocess, "Popen") as m:
+            err = k.launch({"path": "/usr/bin/cmd", "args": ["-x"], "elevated": True})
+        self.assertIsNone(err)
+        m.assert_called_once()
+        self.assertEqual(m.call_args[0][0], ["/usr/bin/pkexec", "/usr/bin/cmd", "-x"])
+
+    def test_launch_elevated_posix_without_pkexec_errors(self):
+        with mock.patch.object(k.os, "name", "posix"), \
+             mock.patch.object(k.shutil, "which", return_value=None):
+            err = k.launch({"path": "/usr/bin/cmd", "args": [], "elevated": True})
+        self.assertIn("pkexec", err)
+
+    def test_shell_execute_runas_success(self):
+        with mock.patch.object(k, "_shell_execute", return_value=42):
+            self.assertIsNone(k._shell_execute_runas(r"C:\x.exe", ["/a"], None))
+
+    def test_shell_execute_runas_reports_failure_code(self):
+        with mock.patch.object(k, "_shell_execute", return_value=5):  # UAC declined
+            err = k._shell_execute_runas(r"C:\x.exe", [], None)
+        self.assertIsNotNone(err)
+        self.assertIn("5", err)
+
+    def test_shell_execute_runas_passes_verb_args_and_cwd(self):
+        with mock.patch.object(k, "_shell_execute", return_value=42) as m:
+            k._shell_execute_runas(r"C:\x.exe", ["/a", "/b"], r"C:\dir")
+        m.assert_called_once_with(r"C:\x.exe", "runas", "/a /b", r"C:\dir")
+
+
+# ---------------------------------------------------------------------------
+# Terminals and power actions
+# ---------------------------------------------------------------------------
+class TestSystemActions(unittest.TestCase):
+    def test_find_terminal_returns_which_path(self):
+        with mock.patch.object(k.shutil, "which", return_value="/x/cmd.exe") as m:
+            self.assertEqual(k.find_terminal("cmd"), "/x/cmd.exe")
+        m.assert_called_with("cmd.exe")
+
+    def test_find_terminal_missing_returns_none(self):
+        with mock.patch.object(k.shutil, "which", return_value=None):
+            self.assertIsNone(k.find_terminal("powershell"))
+
+    def test_shutdown_windows(self):
+        with mock.patch.object(k.os, "name", "nt"), \
+             mock.patch.object(k, "_run_detached", return_value=None) as m:
+            self.assertIsNone(k.shutdown_system())
+        self.assertEqual(m.call_args[0][0], ["shutdown", "/s", "/t", "0"])
+
+    def test_logout_windows(self):
+        with mock.patch.object(k.os, "name", "nt"), \
+             mock.patch.object(k, "_run_detached", return_value=None) as m:
+            self.assertIsNone(k.logout_user())
+        self.assertEqual(m.call_args[0][0], ["shutdown", "/l"])
+
+    def test_shutdown_posix_prefers_systemctl(self):
+        def which(name):
+            return "/usr/bin/systemctl" if name == "systemctl" else None
+        with mock.patch.object(k.os, "name", "posix"), \
+             mock.patch.object(k.shutil, "which", side_effect=which), \
+             mock.patch.object(k, "_run_detached", return_value=None) as m:
+            self.assertIsNone(k.shutdown_system())
+        self.assertEqual(m.call_args[0][0], ["systemctl", "poweroff"])
+
+    def test_shutdown_posix_no_command(self):
+        with mock.patch.object(k.os, "name", "posix"), \
+             mock.patch.object(k.shutil, "which", return_value=None):
+            self.assertIn("no shutdown", k.shutdown_system())
+
+    def test_logout_posix_uses_loginctl(self):
+        with mock.patch.object(k.os, "name", "posix"), \
+             mock.patch.dict(os.environ, {"USER": "student"}), \
+             mock.patch.object(k.shutil, "which", return_value="/usr/bin/loginctl"), \
+             mock.patch.object(k, "_run_detached", return_value=None) as m:
+            self.assertIsNone(k.logout_user())
+        self.assertEqual(m.call_args[0][0], ["loginctl", "terminate-user", "student"])
+
+    def test_shutdown_propagates_error(self):
+        with mock.patch.object(k.os, "name", "nt"), \
+             mock.patch.object(k, "_run_detached", return_value="boom"):
+            self.assertEqual(k.shutdown_system(), "boom")
 
 
 if __name__ == "__main__":
