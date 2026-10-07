@@ -2,6 +2,13 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.9.0] - 2026-10-07
+
+- **Alt+Tab is no longer blocked** in kiosk mode, so students can switch
+  between the apps they have open. The hotkey hook still swallows the Win key,
+  Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc (Task Manager), Alt+Space and Alt+F4;
+  Alt+Shift remains allowed for keyboard-layout switching.
+
 ## [0.8.0] - 2026-09-16
 
 - **Admin menu:** open **Command Prompt** / **PowerShell** (each optionally

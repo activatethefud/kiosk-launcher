@@ -656,9 +656,11 @@ class TestHotkeyBlocking(unittest.TestCase):
         self.assertTrue(k.is_blocked_hotkey(k.VK_LWIN, False, False))
         self.assertTrue(k.is_blocked_hotkey(k.VK_RWIN, False, False))
 
-    def test_alt_tab_and_alt_space_blocked(self):
-        self.assertTrue(k.is_blocked_hotkey(k.VK_TAB, alt_down=True, ctrl_down=False))
+    def test_alt_space_blocked(self):
         self.assertTrue(k.is_blocked_hotkey(k.VK_SPACE, alt_down=True, ctrl_down=False))
+
+    def test_alt_tab_allowed_for_task_switching(self):
+        self.assertFalse(k.is_blocked_hotkey(k.VK_TAB, alt_down=True, ctrl_down=False))
 
     def test_plain_tab_and_space_not_blocked(self):
         self.assertFalse(k.is_blocked_hotkey(k.VK_TAB, False, False))

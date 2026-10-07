@@ -135,7 +135,8 @@ Top-level functions (module `kiosk_launcher`):
   only) — kiosk escape-hotkey blocking. `is_blocked_hotkey` is a pure,
   cross-platform decision function (unit-tested). `KioskHotkeyBlocker` installs
   a `WH_KEYBOARD_LL` ctypes hook on a background thread that swallows the Win
-  key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc, Alt+Space and Alt+F4, and
+  key, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc, Alt+Space and Alt+F4 (Alt+Tab and
+  Alt+Shift are deliberately allowed), and
   calls a callback (which emits a Qt signal → password prompt) for each blocked
   combo. Ctrl+Alt+Del is flagged but Windows delivers the SAS to winlogon, not
   the hook — disable Task Manager/lock/change-password via policy instead.

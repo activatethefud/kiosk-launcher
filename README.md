@@ -30,8 +30,9 @@ more apps by regex.
   - Open **Command Prompt** / **PowerShell**, each optionally as administrator
   - **Shut down** or **log out** of the machine (after a confirmation)
 - **Kiosk mode:** frameless fullscreen; exiting requires the admin password.
-  Escape hotkeys (Win key, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc,
-  Alt+Space) are intercepted on Windows and route to the admin password prompt.
+  Escape hotkeys (Win key, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc, Alt+Space) are
+  intercepted on Windows and route to the admin password prompt (Alt+Tab is
+  left alone so students can switch between open apps).
 - **One config file** (`kiosk_config.json`) — auto-generated on first run
   (gitignored), so each machine can build its own.
 - **App list is a plain data file** (`apps.json`) — extend it with an LLM and
@@ -212,7 +213,8 @@ on for a normal desktop.
 #### Verify on each client
 
 - [ ] Launcher starts fullscreen and app cards appear
-- [ ] `Alt+Tab`, Win key, `Ctrl+Esc`, and `Alt+F4` prompt for the password
+- [ ] Win key, `Ctrl+Esc`, and `Alt+F4` prompt for the password
+      (`Alt+Tab` switches apps normally)
 - [ ] Task Manager is disabled (Ctrl+Alt+Del has no Task Manager)
 - [ ] Editing `apps.json` shows up without restarting (live reload)
 - [ ] Recovery works: `kiosk.bat disable` from the admin account restores the
@@ -293,14 +295,14 @@ Send both files back and the exact cause will be obvious from them.
 In `--kiosk` mode, escape attempts ask for the admin password instead:
 
 - **Windows (system-wide):** a low-level keyboard hook swallows the **Win
-  key** (all Win+… shortcuts), **Alt+Tab**, **Alt+Esc**, **Ctrl+Esc**,
+  key** (all Win+… shortcuts), **Alt+Esc**, **Ctrl+Esc**,
   **Ctrl+Shift+Esc** (Task Manager), **Alt+Space**, and **Alt+F4** for as long
   as the launcher runs. Each attempt pops the admin password prompt.
 - **Everywhere:** **Esc** and **F11** on the launcher itself prompt for the
   password rather than exiting.
 
-**Alt+Shift** (language/layout switching) is explicitly allowed so students
-can switch keyboard layouts; everything else listed above is blocked.
+**Alt+Shift** (language/layout switching) and **Alt+Tab** (task switching) are
+intentionally left unblocked; everything else listed above is blocked.
 
 > **Ctrl+Alt+Del cannot be intercepted by any application** — it's the Windows
 > Secure Attention Sequence, handled by winlogon before hooks see it. Neuter

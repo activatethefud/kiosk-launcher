@@ -48,7 +48,7 @@ import time
 import traceback
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
@@ -1131,12 +1131,13 @@ VK_RSHIFT = 0xA1
 def is_blocked_hotkey(vk, alt_down, ctrl_down):
     """True if this keydown combo is an escape hotkey that should be blocked.
 
-    Blocks: Win key (all Win+... shortcuts), Alt+Tab, Alt+Esc, Ctrl+Esc,
+    Blocks: Win key (all Win+... shortcuts), Alt+Esc, Ctrl+Esc,
     Ctrl+Shift+Esc (Task Manager), Alt+Space, and Alt+F4. Also flags
     Ctrl+Alt+Del for blocking, though Windows delivers the Secure Attention
     Sequence to winlogon (not to this hook) — disable it via policy too.
 
-    Alt+Shift (language/layout switching) is explicitly allowed.
+    Alt+Shift (language/layout switching) and Alt+Tab (task switching) are
+    explicitly allowed.
     """
     # Allow Alt+Shift — the standard Windows language/layout switch.
     if alt_down and vk in (VK_SHIFT, VK_LSHIFT, VK_RSHIFT):
@@ -1145,7 +1146,7 @@ def is_blocked_hotkey(vk, alt_down, ctrl_down):
         return True
     if vk == VK_ESCAPE and (alt_down or ctrl_down):
         return True
-    if alt_down and vk in (VK_TAB, VK_SPACE, VK_F4):
+    if alt_down and vk in (VK_SPACE, VK_F4):
         return True
     if vk == VK_DELETE and alt_down and ctrl_down:
         return True
