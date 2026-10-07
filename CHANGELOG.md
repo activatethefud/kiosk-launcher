@@ -2,6 +2,13 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.10.0] - 2026-10-07
+
+- **Run command…** in the password-protected admin menu: type an arbitrary
+  command line and run it without opening a terminal. The line goes through
+  `cmd /c` on Windows and `sh -c` elsewhere, so quoting, built-ins and pipes
+  work.
+
 ## [0.9.0] - 2026-10-07
 
 - **Alt+Tab is no longer blocked** in kiosk mode, so students can switch

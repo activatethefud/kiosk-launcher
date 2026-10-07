@@ -48,7 +48,7 @@ import time
 import traceback
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.9.0"
+VERSION = "0.10.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
@@ -1088,6 +1088,30 @@ def _run_detached(argv):
     return None
 
 
+def run_command(command):
+    """Run an arbitrary command line (admin escape hatch).
+
+    The line is handed to the platform shell (cmd /c on Windows, /bin/sh -c
+    elsewhere) so quoting, built-ins and pipes work as expected. Non-blocking;
+    returns None or an error string.
+    """
+    if not isinstance(command, str) or not command.strip():
+        return "no command given"
+    if os.name == "nt":
+        argv = [os.environ.get("COMSPEC", "cmd.exe"), "/c", command]
+    else:
+        argv = ["/bin/sh", "-c", command]
+    try:
+        proc = subprocess.Popen(
+            argv, stdin=subprocess.DEVNULL, start_new_session=(os.name != "nt")
+        )
+    except Exception as e:              # noqa: BLE001
+        return str(e)
+    _children.append(proc)
+    _children[:] = [p for p in _children if p.poll() is None]
+    return None
+
+
 def shutdown_system():
     """Power the machine off. Returns None or an error string."""
     if os.name == "nt":
@@ -1749,6 +1773,7 @@ if _HAS_QT:
                     "PowerShell (administrator)",
                     lambda: self.open_terminal("powershell", elevated=True),
                 )
+                menu.addAction("\u25B6  Run command\u2026", self.run_command)
                 menu.addSeparator()
                 menu.addAction("\u23FB  Shut down\u2026", self.shutdown_now)
                 menu.addAction("\U0001F6B6  Log out\u2026", self.logout_now)
@@ -1800,6 +1825,18 @@ if _HAS_QT:
             set_password(self.cfg, new1)
             save_config(self.cfg, self.cfg_path)
             QMessageBox.information(self, "Done", "Password updated.")
+
+        def run_command(self):
+            cmd, ok = QInputDialog.getText(
+                self, "Run command", "Command:", QLineEdit.Normal, ""
+            )
+            if not ok or not cmd.strip():
+                return
+            err = run_command(cmd.strip())
+            if err:
+                QMessageBox.warning(self, "Run failed", err)
+            else:
+                self.status_label.setText(f"Ran: {cmd.strip()}")
 
         def open_terminal(self, kind, elevated=False):
             path = find_terminal(kind)

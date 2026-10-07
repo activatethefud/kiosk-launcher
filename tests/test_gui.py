@@ -328,9 +328,37 @@ class TestAdminFlow(GuiTestBase):
         self.assertTrue(any("Shut down" in t for t in top))
         self.assertTrue(any("Log out" in t for t in top))
         self.assertTrue(any("Terminal" in t for t in top))
+        self.assertTrue(any("Run command" in t for t in top))
         self.assertTrue(any("Command Prompt" in t for t in sub))
         self.assertTrue(any("PowerShell" in t for t in sub))
         self.assertTrue(any("administrator" in t for t in sub))
+
+    def test_run_command_action_executes(self):
+        win, *_ = self.make_window(password="secret")
+        with mock.patch.object(k, "run_command", return_value=None) as m:
+            QTimer.singleShot(100, lambda: _fill_input("secret"))
+            QTimer.singleShot(300, lambda: _trigger_menu("Run command"))
+            QTimer.singleShot(600, lambda: _fill_input("echo hi"))
+            win.on_admin()
+        m.assert_called_once_with("echo hi")
+
+    def test_run_command_error_shows_warning(self):
+        win, *_ = self.make_window(password="secret")
+        warnings = []
+
+        def grab():
+            w = _active_modal()
+            if isinstance(w, QMessageBox):
+                warnings.append(w)
+                w.accept()
+
+        with mock.patch.object(k, "run_command", return_value="boom"):
+            QTimer.singleShot(100, lambda: _fill_input("secret"))
+            QTimer.singleShot(300, lambda: _trigger_menu("Run command"))
+            QTimer.singleShot(600, lambda: _fill_input("bad"))
+            QTimer.singleShot(900, grab)
+            win.on_admin()
+        self.assertEqual(len(warnings), 1)
 
     def test_shutdown_action_confirms_and_calls(self):
         win, *_ = self.make_window(password="secret")

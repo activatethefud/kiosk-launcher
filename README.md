@@ -27,6 +27,8 @@ more apps by regex.
   - Add an app by name + one-or-more regexes (matched against the exe path)
   - Mark an app to **run as administrator** (Windows UAC / Linux `pkexec`)
   - Remove apps, change the password, rescan
+  - **Run command…** — run an arbitrary command line (via `cmd /c` on Windows,
+    `sh -c` elsewhere)
   - Open **Command Prompt** / **PowerShell**, each optionally as administrator
   - **Shut down** or **log out** of the machine (after a confirmation)
 - **Kiosk mode:** frameless fullscreen; exiting requires the admin password.

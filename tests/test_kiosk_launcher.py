@@ -1115,6 +1115,32 @@ class TestSystemActions(unittest.TestCase):
              mock.patch.object(k, "_run_detached", return_value="boom"):
             self.assertEqual(k.shutdown_system(), "boom")
 
+    def test_run_command_rejects_empty(self):
+        self.assertIsNotNone(k.run_command(""))
+        self.assertIsNotNone(k.run_command("   "))
+        self.assertIsNotNone(k.run_command(None))
+
+    def test_run_command_posix_uses_sh(self):
+        with mock.patch.object(k.os, "name", "posix"), \
+             mock.patch.object(k.subprocess, "Popen") as m:
+            self.assertIsNone(k.run_command("echo hi | wc -l"))
+        m.assert_called_once()
+        self.assertEqual(
+            m.call_args[0][0], ["/bin/sh", "-c", "echo hi | wc -l"]
+        )
+
+    def test_run_command_windows_uses_cmd(self):
+        comspec = r"C:\Windows\System32\cmd.exe"
+        with mock.patch.object(k.os, "name", "nt"), \
+             mock.patch.dict(os.environ, {"COMSPEC": comspec}), \
+             mock.patch.object(k.subprocess, "Popen") as m:
+            self.assertIsNone(k.run_command("dir"))
+        self.assertEqual(m.call_args[0][0], [comspec, "/c", "dir"])
+
+    def test_run_command_reports_error(self):
+        with mock.patch.object(k.subprocess, "Popen", side_effect=OSError("nope")):
+            self.assertIn("nope", k.run_command("whatever"))
+
 
 if __name__ == "__main__":
     unittest.main()

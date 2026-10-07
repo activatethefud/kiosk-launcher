@@ -147,7 +147,8 @@ Top-level functions (module `kiosk_launcher`):
   `addapp_name`, `addapp_elevated`, `removeapp_list`) for deterministic lookup
   in tests. The password-gated admin menu offers add/remove/change-password/
   rescan, a **Terminal** submenu (Command Prompt / PowerShell, each optionally
-  as administrator), and **Shut down** / **Log out** (both confirmed first).
+  as administrator), a **Run command…** prompt (runs an arbitrary line via the
+  platform shell), and **Shut down** / **Log out** (both confirmed first).
 - `fatal_error(message)` / `error_log_path()` / `_install_excepthook()` —
   errors in a windowed build are invisible (stderr is discarded), so fatal
   errors are appended to `kiosk-error.log` next to the exe and shown in a
