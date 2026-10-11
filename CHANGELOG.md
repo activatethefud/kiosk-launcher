@@ -2,6 +2,12 @@
 
 All notable changes to Kiosk Launcher.
 
+## [0.11.0] - 2026-10-07
+
+- **OBS Studio preset:** matches the Windows `obs-studio\bin\...\obs64.exe`
+  install, Linux `obs`/`obs-studio` binaries, and the flatpak
+  `com.obsproject.Studio` export.
+
 ## [0.10.0] - 2026-10-07
 
 - **Run command…** in the password-protected admin menu: type an arbitrary

@@ -541,6 +541,30 @@ class TestBuiltinPresets(unittest.TestCase):
         self.assertEqual(found, [])
         self.assertEqual(missing, ["Mu Editor"])
 
+    def test_obs_studio_matches_windows_linux_and_flatpak(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "OBS Studio"]
+        for candidate in (
+            r"C:\Program Files\obs-studio\bin\64bit\obs64.exe",
+            r"C:\Program Files\obs-studio\bin\64bit\obs.exe",
+            "/usr/bin/obs",
+            "/var/lib/flatpak/exports/bin/com.obsproject.Studio",
+            "/snap/bin/obs-studio",
+        ):
+            with mock.patch.object(
+                k, "gather_candidates", return_value={candidate}
+            ):
+                found, missing = k.discover_apps(apps)
+            self.assertEqual(len(found), 1, candidate)
+            self.assertEqual(missing, [])
+
+    def test_obs_studio_ignores_unrelated_obs(self):
+        apps = [a for a in k.BUILTIN_APPS if a["name"] == "OBS Studio"]
+        candidates = {r"C:\tools\jobs.exe", "/usr/bin/obsidian"}
+        with mock.patch.object(k, "gather_candidates", return_value=candidates):
+            found, missing = k.discover_apps(apps)
+        self.assertEqual(found, [])
+        self.assertEqual(missing, ["OBS Studio"])
+
     def test_no_browser_or_game_presets(self):
         names = {a["name"].lower() for a in k.BUILTIN_APPS}
         for banned in (

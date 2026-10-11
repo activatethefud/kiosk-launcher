@@ -247,6 +247,15 @@
     "args": []
   },
   {
+    "name": "OBS Studio",
+    "patterns": [
+      "[\\\\/]obs(?:64)?(?:\\.exe)?$",
+      "[\\\\/]obs-studio(?:\\.exe)?$",
+      "com\\.obsproject\\.Studio$"
+    ],
+    "args": []
+  },
+  {
     "name": "Audacity",
     "patterns": [
       "audacity(?:\\.exe)?$"

@@ -48,7 +48,7 @@ import time
 import traceback
 
 APP_NAME = "Kiosk Launcher"
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 DEFAULT_PASSWORD = "admin"
 
 # --------------------------------------------------------------------------
@@ -244,6 +244,16 @@ BUILTIN_APPS = [
         "patterns": [r"blender(?:\.exe)?$"],
         "args": [],
     },
+    # Screen recording / streaming (FOSS)
+    {
+        "name": "OBS Studio",
+        "patterns": [
+            r"[\\/]obs(?:64)?(?:\.exe)?$",
+            r"[\\/]obs-studio(?:\.exe)?$",
+            r"com\.obsproject\.Studio$",
+        ],
+        "args": [],
+    },
     # Audio editing (FOSS)
     {
         "name": "Audacity",
@@ -404,6 +414,7 @@ EMOJI = {
     "olive": "\U0001F3A5",
     "avidemux": "\U0001F4FD\uFE0F",
     "blender": "\U0001F9CA",
+    "obs studio": "\U0001F4F9",
     "audacity": "\U0001F3A7",
     "ardour": "\U0001F39B\uFE0F",
     "lmms": "\U0001F3B9",
